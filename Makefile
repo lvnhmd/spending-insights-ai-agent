@@ -32,3 +32,15 @@ diff:
 # List CDK stacks
 list:
 	cd infra && npx cdk list
+
+# Test database operations (unit tests)
+test-db:
+	npm test -- --testPathPatterns=database-operations.test.ts
+
+# Validate database setup
+validate-db:
+	npx ts-node --project scripts/tsconfig.json scripts/validate-database-setup.ts
+
+# Test database with sample data (requires deployed tables)
+test-db-integration:
+	npx ts-node --project scripts/tsconfig.json scripts/test-database-operations.ts

@@ -58,7 +58,7 @@
   - Write unit tests for CSV processing with sample data
   - _Requirements: 1.1, 1.2, 1.4, 6.2_
 
-- [ ] 3. Create DynamoDB tables with optimized keys and basic operations
+- [x] 3. Create DynamoDB tables with optimized keys and basic operations
   - Create tables with proper keys:
     - transactions: pk=USER#${userId}, sk=DT#${yyyy-mm-dd}#TX#${txId}, GSI1 userWeekIdx: pk=USER#${userId}#W#${isoWeek}, sk=CAT#${category}
     - weekly-insights: pk=USER#${userId}, sk=W#${isoWeek}

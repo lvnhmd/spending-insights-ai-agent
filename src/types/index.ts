@@ -130,3 +130,23 @@ export interface PIIField {
   startIndex: number;
   endIndex: number;
 }
+
+// User Profile Types
+export interface UserProfile {
+  userId: string;
+  email?: string;
+  name?: string;
+  financialGoals: string[];
+  riskTolerance: 'low' | 'medium' | 'high';
+  monthlyIncome?: number;
+  monthlyBudget?: number;
+  preferredCategories: string[];
+  notificationPreferences: {
+    weeklyInsights: boolean;
+    feeAlerts: boolean;
+    savingsGoals: boolean;
+  };
+  onboardingCompleted: boolean;
+  createdAt: Date;
+  updatedAt: Date;
+}

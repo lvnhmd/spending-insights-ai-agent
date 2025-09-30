@@ -1,17 +1,35 @@
 {
-  "name": "mamamoneymentor",
+  "name": "spending-insights-ai-agent",
   "version": "1.0.0",
+  "description": "AI-powered spending insights agent for women and moms to transform financial data into actionable weekly money wins",
   "main": "index.js",
+  "workspaces": [
+    "app",
+    "infra"
+  ],
   "directories": {
     "doc": "docs"
   },
   "scripts": {
-    "test": "jest"
+    "test": "jest",
+    "install:all": "npm install && npm run install:infra && npm run install:app",
+    "install:infra": "cd infra && npm install",
+    "install:app": "cd app && npm install",
+    "build": "npm run build:infra",
+    "build:infra": "cd infra && npm run build",
+    "deploy": "make deploy",
+    "destroy": "make destroy"
   },
-  "keywords": [],
+  "keywords": [
+    "ai",
+    "financial-insights",
+    "aws",
+    "bedrock",
+    "hackathon",
+    "spending-analysis"
+  ],
   "author": "",
   "license": "ISC",
-  "description": "",
   "devDependencies": {
     "@types/jest": "^30.0.0",
     "@types/node": "^24.6.0",

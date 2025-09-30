@@ -18,7 +18,7 @@
   - Verify S3, DynamoDB, EventBridge are available in your region
   - _Requirements: 8.1_
 
-- [ ] 0.3 Prepare development environment and guardrails
+- [x] 0.3 Prepare development environment and guardrails
   - Install AWS CDK, Node.js, TypeScript
   - Configure AWS CLI credentials
   - Test `cdk bootstrap` in development account
@@ -31,8 +31,8 @@
 
 ### Days 1-2: Foundation Setup
 
-- [ ] 1. Set up CDK project structure with reproducible deployment
-  - [ ] 1.1 Create GitHub repository and local structure
+- [-] 1. Set up CDK project structure with reproducible deployment
+  - [-] 1.1 Create GitHub repository and local structure
     - Create public GitHub repository: "spending-insights-ai-agent"
     - Set up local folder structure: /app, /infra, /infra/agent, /scripts, /guardrails, /docs, /cache
     - Initialize CDK project in /infra directory

@@ -1,0 +1,16 @@
+date,description,amount,account,category
+01/15/2024,Starbucks Coffee #1234,-4.95,Checking,Food & Dining
+01/15/2024,Amazon Prime Subscription,-14.99,Credit Card,Shopping
+01/16/2024,Salary Deposit,2500.00,Checking,Income
+01/16/2024,Grocery Store Purchase,-67.43,Debit Card,Groceries
+01/17/2024,Netflix Subscription,-15.99,Credit Card,Entertainment
+01/17/2024,Gas Station Fill-up,-45.20,Credit Card,Transportation
+01/18/2024,ATM Withdrawal,-100.00,Checking,Cash
+01/18/2024,Restaurant Dinner,-89.50,Credit Card,Food & Dining
+01/19/2024,Utility Bill Payment,-125.67,Checking,Utilities
+01/19/2024,Online Shopping,-234.99,Credit Card,Shopping
+01/20/2024,Coffee Shop,-3.75,Debit Card,Food & Dining
+01/20/2024,Gym Membership,-29.99,Credit Card,Health & Fitness
+01/21/2024,Freelance Payment,750.00,Checking,Income
+01/21/2024,Pharmacy Purchase,-23.45,Credit Card,Healthcare
+01/22/2024,Movie Theater,-24.50,Credit Card,Entertainment

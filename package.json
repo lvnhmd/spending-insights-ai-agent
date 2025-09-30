@@ -34,7 +34,9 @@
   "dependencies": {
     "@aws-sdk/client-dynamodb": "^3.450.0",
     "@aws-sdk/lib-dynamodb": "^3.450.0",
-    "ts-node": "^10.9.0"
+    "@types/uuid": "^10.0.0",
+    "ts-node": "^10.9.0",
+    "uuid": "^13.0.0"
   },
   "devDependencies": {
     "@types/jest": "^30.0.0",

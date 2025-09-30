@@ -1,0 +1,7 @@
+date,description,amount,account
+01/15/2024,Payment to card 4532-1234-5678-9012,-100.00,Checking
+01/16/2024,Transfer from account 987654321,500.00,Savings
+01/17/2024,Payment to john.doe@example.com via Venmo,-50.00,Credit Card
+01/18/2024,Call 555-123-4567 for service,-25.00,Checking
+01/19/2024,Delivery to 123 Main Street,-75.00,Credit Card
+01/20/2024,SSN verification 123-45-6789 fee,-10.00,Checking

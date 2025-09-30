@@ -51,7 +51,7 @@
 
 ### Days 3-4: Data Layer
 
-- [ ] 2. Build CSV processing and data models
+- [x] 2. Build CSV processing and data models
   - Create TypeScript interfaces for Transaction, WeeklyInsight, and Recommendation
   - Implement CSV parser with error handling for malformed data
   - Build transaction data sanitization with basic PII redaction

@@ -1,0 +1,35 @@
+{
+  "name": "SpendingInsightsGuardrails",
+  "description": "PII redaction and financial advice protection",
+  "contentPolicyConfig": {
+    "filtersConfig": [
+      {
+        "type": "PROMPT_ATTACK",
+        "inputStrength": "HIGH",
+        "outputStrength": "NONE"
+      }
+    ]
+  },
+  "sensitiveInformationPolicyConfig": {
+    "piiEntitiesConfig": [
+      { "type": "CREDIT_DEBIT_CARD_NUMBER", "action": "BLOCK" },
+      { "type": "US_BANK_ACCOUNT_NUMBER", "action": "ANONYMIZE" },
+      { "type": "EMAIL", "action": "ANONYMIZE" },
+      { "type": "PHONE", "action": "ANONYMIZE" }
+    ]
+  },
+  "topicPolicyConfig": {
+    "topicsConfig": [
+      {
+        "name": "FinancialAdvice",
+        "definition": "Prescriptive investment recommendations or specific securities advice",
+        "examples": [
+          "You should buy Tesla stock",
+          "I recommend investing in Bitcoin",
+          "Put 60% in S&P 500 index fund"
+        ],
+        "type": "DENY"
+      }
+    ]
+  }
+}

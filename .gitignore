@@ -1,0 +1,9 @@
+node_modules/
+.env
+cdk.out/
+*.log
+.DS_Store
+dist/
+build/
+coverage/
+.aws-sam/

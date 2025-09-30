@@ -18,7 +18,8 @@
     "build": "npm run build:infra",
     "build:infra": "cd infra && npm run build",
     "deploy": "make deploy",
-    "destroy": "make destroy"
+    "destroy": "make destroy",
+    "seed": "npx ts-node --project scripts/tsconfig.json scripts/seed.ts"
   },
   "keywords": [
     "ai",
@@ -30,6 +31,11 @@
   ],
   "author": "",
   "license": "ISC",
+  "dependencies": {
+    "@aws-sdk/client-dynamodb": "^3.450.0",
+    "@aws-sdk/lib-dynamodb": "^3.450.0",
+    "ts-node": "^10.9.0"
+  },
   "devDependencies": {
     "@types/jest": "^30.0.0",
     "@types/node": "^24.6.0",

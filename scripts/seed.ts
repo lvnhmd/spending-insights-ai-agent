@@ -15,7 +15,7 @@ const docClient = DynamoDBDocumentClient.from(client);
 
 async function seedDatabase() {
   console.log('🌱 Starting database seeding...');
-  
+
   try {
     // Sample user profile
     await docClient.send(new PutCommand({
@@ -67,7 +67,7 @@ async function seedDatabase() {
     }
 
     console.log('✅ Database seeding completed successfully!');
-    
+
   } catch (error) {
     console.error('❌ Error seeding database:', error);
     process.exit(1);

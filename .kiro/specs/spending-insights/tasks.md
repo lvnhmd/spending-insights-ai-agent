@@ -31,7 +31,7 @@
 
 ### Days 1-2: Foundation Setup
 
-- [-] 1. Set up CDK project structure with reproducible deployment
+- [x] 1. Set up CDK project structure with reproducible deployment
   - [x] 1.1 Create GitHub repository and local structure
     - Create public GitHub repository: "spending-insights-ai-agent"
     - Set up local folder structure: /app, /infra, /infra/agent, /scripts, /guardrails, /docs, /cache
@@ -41,7 +41,7 @@
     - First commit: "Initial project structure"
     - _Requirements: 8.1_
   
-  - [-] 1.2 Configure AWS infrastructure with CDK
+  - [x] 1.2 Configure AWS infrastructure with CDK
     - Configure DynamoDB tables with proper keys, S3 bucket, Lambda function skeletons
     - Set up least-privilege IAM: Lambda can only read s3://bucket/${env}/, DDB table ARNs, bedrock:InvokeModel
     - Create Makefile with deploy/destroy/seed commands for one-liner deployment

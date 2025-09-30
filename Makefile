@@ -17,10 +17,9 @@ deploy:
 destroy:
 	cd infra && npx cdk destroy --all --force
 
-# Seed database with sample data (to be implemented)
+# Seed database with sample data
 seed:
-	@echo "Seed script to be implemented in scripts/seed.ts"
-	# npx ts-node scripts/seed.ts
+	npm run seed
 
 # Build infra
 build:

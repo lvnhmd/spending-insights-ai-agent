@@ -99,7 +99,7 @@ export class SpendingInsightsStack extends cdk.Stack {
     // Transaction Processor Lambda
     const transactionProcessorLambda = new lambda.Function(this, 'TransactionProcessorLambda', {
       functionName: 'spending-insights-transaction-processor',
-      runtime: lambda.Runtime.NODEJS_18_X,
+      runtime: lambda.Runtime.NODEJS_20_X,
       handler: 'index.handler',
       code: lambda.Code.fromInline(`
         exports.handler = async (event) => {
@@ -118,7 +118,7 @@ export class SpendingInsightsStack extends cdk.Stack {
     // Weekly Insights Generator Lambda
     const weeklyInsightsLambda = new lambda.Function(this, 'WeeklyInsightsLambda', {
       functionName: 'spending-insights-weekly-generator',
-      runtime: lambda.Runtime.NODEJS_18_X,
+      runtime: lambda.Runtime.NODEJS_20_X,
       handler: 'index.handler',
       code: lambda.Code.fromInline(`
         exports.handler = async (event) => {
@@ -137,7 +137,7 @@ export class SpendingInsightsStack extends cdk.Stack {
     // API Handler Lambda
     const apiHandlerLambda = new lambda.Function(this, 'ApiHandlerLambda', {
       functionName: 'spending-insights-api-handler',
-      runtime: lambda.Runtime.NODEJS_18_X,
+      runtime: lambda.Runtime.NODEJS_20_X,
       handler: 'index.handler',
       code: lambda.Code.fromInline(`
         exports.handler = async (event) => {

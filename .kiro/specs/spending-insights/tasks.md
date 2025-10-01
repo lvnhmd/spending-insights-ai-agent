@@ -71,8 +71,8 @@
 
 ### Days 5-7: Lambda Functions (Test Locally First)
 
-- [ ] 4. Build core Lambda functions with mock data
-  - [ ] 4.1 Create transaction-processor Lambda function with mock LLM path
+- [x] 4. Build core Lambda functions with mock data
+  - [x] 4.1 Create transaction-processor Lambda function with mock LLM path
     - Implement transaction categorization logic using Claude 3 Haiku
     - Build fee and subscription detection algorithms
     - Add basic pattern recognition for recurring charges
@@ -80,7 +80,7 @@
     - Test locally with sample CSV data (no AWS calls yet)
     - _Requirements: 1.2, 1.4, 3.1, 3.2, 7.3_
 
-  - [ ] 4.2 Create weekly-insights-generator Lambda function
+  - [x] 4.2 Create weekly-insights-generator Lambda function
     - Implement spending pattern analysis and trend detection
     - Build recommendation generation with impact vs effort prioritization
     - Create post-hoc explanation generation for transparency
@@ -88,7 +88,7 @@
     - Test locally with mock transaction data
     - _Requirements: 2.1, 2.2, 2.3, 2.4, 7.3, 8.6_
 
-  - [ ] 4.3 Create api-handler Lambda function with health endpoints
+  - [x] 4.3 Create api-handler Lambda function with health endpoints
     - Set Lambda timeout to 25 seconds (not 30s - leave buffer for API Gateway)
     - Build REST API endpoints for CSV upload and insights retrieval
     - Implement basic user session management

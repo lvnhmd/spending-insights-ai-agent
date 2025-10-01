@@ -1,0 +1,23 @@
+{
+  "name": "spending-insights-lambda-functions",
+  "version": "1.0.0",
+  "description": "Lambda functions for the Spending Insights AI Agent",
+  "scripts": {
+    "test:local": "npx ts-node test-local.ts",
+    "build": "tsc",
+    "test": "jest --run"
+  },
+  "dependencies": {
+    "@aws-sdk/client-bedrock-runtime": "^3.0.0",
+    "@aws-sdk/client-lambda": "^3.0.0",
+    "@aws-sdk/lib-dynamodb": "^3.0.0"
+  },
+  "devDependencies": {
+    "@types/aws-lambda": "^8.10.0",
+    "@types/node": "^20.0.0",
+    "typescript": "^5.0.0",
+    "ts-node": "^10.0.0",
+    "jest": "^29.0.0",
+    "@types/jest": "^29.0.0"
+  }
+}

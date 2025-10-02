@@ -97,14 +97,14 @@
     - Test API endpoints locally
     - _Requirements: 8.1, 8.5_
 
-- [ ] 5. Local testing and validation
+- [x] 5. Local testing and validation
   - Test all Lambda functions with sample data locally
   - Validate categorization accuracy with diverse transaction types
   - Test fee detection with various subscription patterns
   - Verify recommendation generation produces actionable insights
   - _Requirements: 7.6, 8.1_
 
-- [ ] 5.5 AgentCore learning and scripted registration (Day 7 afternoon - CRITICAL)
+- [x] 5.5 AgentCore learning and scripted registration (Day 7 afternoon - CRITICAL)
   - Review AWS Bedrock AgentCore documentation thoroughly
   - Study Action Groups examples in AWS samples repository
   - Test simple "hello world" agent with 1 tool before real implementation

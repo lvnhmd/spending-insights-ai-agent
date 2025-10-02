@@ -1,0 +1,1004 @@
+{
+  "openapi": "3.0.0",
+  "info": {
+    "title": "Spending Insights AI Agent Tools",
+    "description": "Financial analysis tools for the Spending Insights AI Agent",
+    "version": "1.0.0"
+  },
+  "servers": [
+    {
+      "url": "https://api.spending-insights.example.com",
+      "description": "Production API Gateway endpoint"
+    }
+  ],
+  "paths": {
+    "/tools/analyze-spending-patterns": {
+      "post": {
+        "summary": "Analyzes user spending patterns and identifies trends, anomalies, and insights from transaction data",
+        "description": "Analyzes user spending patterns and identifies trends, anomalies, and insights from transaction data\n\nThis tool is part of the autonomous financial analysis workflow.",
+        "operationId": "analyze_spending_patterns",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "userId": {
+                    "type": "string",
+                    "description": "User identifier"
+                  },
+                  "timeframe": {
+                    "type": "string",
+                    "enum": [
+                      "week",
+                      "month",
+                      "quarter"
+                    ],
+                    "description": "Analysis timeframe"
+                  },
+                  "categories": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    },
+                    "description": "Optional category filter"
+                  }
+                },
+                "required": [
+                  "userId",
+                  "timeframe"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "patterns": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "category": {
+                            "type": "string"
+                          },
+                          "trend": {
+                            "type": "string",
+                            "enum": [
+                              "increasing",
+                              "decreasing",
+                              "stable"
+                            ]
+                          },
+                          "averageAmount": {
+                            "type": "number"
+                          },
+                          "frequency": {
+                            "type": "number"
+                          },
+                          "insights": {
+                            "type": "string"
+                          }
+                        }
+                      }
+                    },
+                    "totalSpent": {
+                      "type": "number"
+                    },
+                    "topCategories": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request - invalid input parameters"
+          },
+          "500": {
+            "description": "Internal server error"
+          }
+        },
+        "tags": [
+          "Financial Analysis Tools"
+        ]
+      }
+    },
+    "/tools/categorize-transactions": {
+      "post": {
+        "summary": "Intelligently categorizes financial transactions using AI and pattern recognition",
+        "description": "Intelligently categorizes financial transactions using AI and pattern recognition\n\nThis tool is part of the autonomous financial analysis workflow.",
+        "operationId": "categorize_transactions",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "transactions": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "string"
+                        },
+                        "description": {
+                          "type": "string"
+                        },
+                        "amount": {
+                          "type": "number"
+                        },
+                        "date": {
+                          "type": "string",
+                          "format": "date"
+                        },
+                        "merchantName": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "id",
+                        "description",
+                        "amount",
+                        "date"
+                      ]
+                    }
+                  }
+                },
+                "required": [
+                  "transactions"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "categorizedTransactions": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "transactionId": {
+                            "type": "string"
+                          },
+                          "category": {
+                            "type": "string"
+                          },
+                          "subcategory": {
+                            "type": "string"
+                          },
+                          "confidence": {
+                            "type": "number",
+                            "minimum": 0,
+                            "maximum": 1
+                          },
+                          "reasoning": {
+                            "type": "string"
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request - invalid input parameters"
+          },
+          "500": {
+            "description": "Internal server error"
+          }
+        },
+        "tags": [
+          "Financial Analysis Tools"
+        ]
+      }
+    },
+    "/tools/detect-fees-and-subscriptions": {
+      "post": {
+        "summary": "Detects recurring subscriptions, bank fees, and unnecessary charges in transaction data",
+        "description": "Detects recurring subscriptions, bank fees, and unnecessary charges in transaction data\n\nThis tool is part of the autonomous financial analysis workflow.",
+        "operationId": "detect_fees_and_subscriptions",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "userId": {
+                    "type": "string",
+                    "description": "User identifier"
+                  },
+                  "transactions": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "string"
+                        },
+                        "description": {
+                          "type": "string"
+                        },
+                        "amount": {
+                          "type": "number"
+                        },
+                        "date": {
+                          "type": "string",
+                          "format": "date"
+                        },
+                        "isRecurring": {
+                          "type": "boolean"
+                        }
+                      }
+                    }
+                  }
+                },
+                "required": [
+                  "userId",
+                  "transactions"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "detectedFees": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "transactionId": {
+                            "type": "string"
+                          },
+                          "type": {
+                            "type": "string",
+                            "enum": [
+                              "subscription",
+                              "bank_fee",
+                              "service_charge"
+                            ]
+                          },
+                          "annualCost": {
+                            "type": "number"
+                          },
+                          "cancellationDifficulty": {
+                            "type": "string",
+                            "enum": [
+                              "easy",
+                              "medium",
+                              "hard"
+                            ]
+                          },
+                          "recommendation": {
+                            "type": "string"
+                          }
+                        }
+                      }
+                    },
+                    "totalAnnualCost": {
+                      "type": "number"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request - invalid input parameters"
+          },
+          "500": {
+            "description": "Internal server error"
+          }
+        },
+        "tags": [
+          "Financial Analysis Tools"
+        ]
+      }
+    },
+    "/tools/generate-savings-recommendations": {
+      "post": {
+        "summary": "Generates personalized money-saving recommendations based on spending analysis",
+        "description": "Generates personalized money-saving recommendations based on spending analysis\n\nThis tool is part of the autonomous financial analysis workflow.",
+        "operationId": "generate_savings_recommendations",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "userId": {
+                    "type": "string",
+                    "description": "User identifier"
+                  },
+                  "spendingPatterns": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "category": {
+                          "type": "string"
+                        },
+                        "amount": {
+                          "type": "number"
+                        },
+                        "frequency": {
+                          "type": "number"
+                        }
+                      }
+                    }
+                  },
+                  "detectedFees": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "type": {
+                          "type": "string"
+                        },
+                        "amount": {
+                          "type": "number"
+                        },
+                        "description": {
+                          "type": "string"
+                        }
+                      }
+                    }
+                  }
+                },
+                "required": [
+                  "userId",
+                  "spendingPatterns"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "recommendations": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string"
+                          },
+                          "title": {
+                            "type": "string"
+                          },
+                          "description": {
+                            "type": "string"
+                          },
+                          "potentialSavings": {
+                            "type": "number"
+                          },
+                          "difficulty": {
+                            "type": "string",
+                            "enum": [
+                              "easy",
+                              "medium",
+                              "hard"
+                            ]
+                          },
+                          "priority": {
+                            "type": "number",
+                            "minimum": 1,
+                            "maximum": 10
+                          },
+                          "actionSteps": {
+                            "type": "array",
+                            "items": {
+                              "type": "string"
+                            }
+                          },
+                          "reasoning": {
+                            "type": "string"
+                          },
+                          "confidence": {
+                            "type": "number",
+                            "minimum": 0,
+                            "maximum": 1
+                          }
+                        }
+                      }
+                    },
+                    "totalPotentialSavings": {
+                      "type": "number"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request - invalid input parameters"
+          },
+          "500": {
+            "description": "Internal server error"
+          }
+        },
+        "tags": [
+          "Financial Analysis Tools"
+        ]
+      }
+    },
+    "/tools/calculate-investment-readiness": {
+      "post": {
+        "summary": "Assesses user financial stability and readiness for investment education (educational purposes only)",
+        "description": "Assesses user financial stability and readiness for investment education (educational purposes only)\n\nThis tool is part of the autonomous financial analysis workflow.",
+        "operationId": "calculate_investment_readiness",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "userId": {
+                    "type": "string",
+                    "description": "User identifier"
+                  },
+                  "monthlyIncome": {
+                    "type": "number",
+                    "description": "Monthly income amount"
+                  },
+                  "monthlyExpenses": {
+                    "type": "number",
+                    "description": "Monthly expenses amount"
+                  },
+                  "emergencyFund": {
+                    "type": "number",
+                    "description": "Current emergency fund amount"
+                  },
+                  "debts": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "type": {
+                          "type": "string"
+                        },
+                        "amount": {
+                          "type": "number"
+                        },
+                        "interestRate": {
+                          "type": "number"
+                        }
+                      }
+                    }
+                  }
+                },
+                "required": [
+                  "userId",
+                  "monthlyIncome",
+                  "monthlyExpenses"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "readinessScore": {
+                      "type": "number",
+                      "minimum": 0,
+                      "maximum": 100
+                    },
+                    "readinessLevel": {
+                      "type": "string",
+                      "enum": [
+                        "not_ready",
+                        "building_foundation",
+                        "ready_to_learn"
+                      ]
+                    },
+                    "recommendations": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "priority": {
+                            "type": "string",
+                            "enum": [
+                              "high",
+                              "medium",
+                              "low"
+                            ]
+                          },
+                          "action": {
+                            "type": "string"
+                          },
+                          "description": {
+                            "type": "string"
+                          },
+                          "educationalResources": {
+                            "type": "array",
+                            "items": {
+                              "type": "string"
+                            }
+                          }
+                        }
+                      }
+                    },
+                    "disclaimer": {
+                      "type": "string",
+                      "const": "This is educational information only, not financial advice. Consult a licensed financial advisor before making investment decisions."
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request - invalid input parameters"
+          },
+          "500": {
+            "description": "Internal server error"
+          }
+        },
+        "tags": [
+          "Financial Analysis Tools"
+        ]
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "analyze_spending_patterns_input": {
+        "type": "object",
+        "properties": {
+          "userId": {
+            "type": "string",
+            "description": "User identifier"
+          },
+          "timeframe": {
+            "type": "string",
+            "enum": [
+              "week",
+              "month",
+              "quarter"
+            ],
+            "description": "Analysis timeframe"
+          },
+          "categories": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Optional category filter"
+          }
+        },
+        "required": [
+          "userId",
+          "timeframe"
+        ]
+      },
+      "analyze_spending_patterns_output": {
+        "type": "object",
+        "properties": {
+          "patterns": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "category": {
+                  "type": "string"
+                },
+                "trend": {
+                  "type": "string",
+                  "enum": [
+                    "increasing",
+                    "decreasing",
+                    "stable"
+                  ]
+                },
+                "averageAmount": {
+                  "type": "number"
+                },
+                "frequency": {
+                  "type": "number"
+                },
+                "insights": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "totalSpent": {
+            "type": "number"
+          },
+          "topCategories": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        }
+      },
+      "categorize_transactions_input": {
+        "type": "object",
+        "properties": {
+          "transactions": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string"
+                },
+                "description": {
+                  "type": "string"
+                },
+                "amount": {
+                  "type": "number"
+                },
+                "date": {
+                  "type": "string",
+                  "format": "date"
+                },
+                "merchantName": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "id",
+                "description",
+                "amount",
+                "date"
+              ]
+            }
+          }
+        },
+        "required": [
+          "transactions"
+        ]
+      },
+      "categorize_transactions_output": {
+        "type": "object",
+        "properties": {
+          "categorizedTransactions": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "transactionId": {
+                  "type": "string"
+                },
+                "category": {
+                  "type": "string"
+                },
+                "subcategory": {
+                  "type": "string"
+                },
+                "confidence": {
+                  "type": "number",
+                  "minimum": 0,
+                  "maximum": 1
+                },
+                "reasoning": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      },
+      "detect_fees_and_subscriptions_input": {
+        "type": "object",
+        "properties": {
+          "userId": {
+            "type": "string",
+            "description": "User identifier"
+          },
+          "transactions": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string"
+                },
+                "description": {
+                  "type": "string"
+                },
+                "amount": {
+                  "type": "number"
+                },
+                "date": {
+                  "type": "string",
+                  "format": "date"
+                },
+                "isRecurring": {
+                  "type": "boolean"
+                }
+              }
+            }
+          }
+        },
+        "required": [
+          "userId",
+          "transactions"
+        ]
+      },
+      "detect_fees_and_subscriptions_output": {
+        "type": "object",
+        "properties": {
+          "detectedFees": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "transactionId": {
+                  "type": "string"
+                },
+                "type": {
+                  "type": "string",
+                  "enum": [
+                    "subscription",
+                    "bank_fee",
+                    "service_charge"
+                  ]
+                },
+                "annualCost": {
+                  "type": "number"
+                },
+                "cancellationDifficulty": {
+                  "type": "string",
+                  "enum": [
+                    "easy",
+                    "medium",
+                    "hard"
+                  ]
+                },
+                "recommendation": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "totalAnnualCost": {
+            "type": "number"
+          }
+        }
+      },
+      "generate_savings_recommendations_input": {
+        "type": "object",
+        "properties": {
+          "userId": {
+            "type": "string",
+            "description": "User identifier"
+          },
+          "spendingPatterns": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "category": {
+                  "type": "string"
+                },
+                "amount": {
+                  "type": "number"
+                },
+                "frequency": {
+                  "type": "number"
+                }
+              }
+            }
+          },
+          "detectedFees": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "type": {
+                  "type": "string"
+                },
+                "amount": {
+                  "type": "number"
+                },
+                "description": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        },
+        "required": [
+          "userId",
+          "spendingPatterns"
+        ]
+      },
+      "generate_savings_recommendations_output": {
+        "type": "object",
+        "properties": {
+          "recommendations": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string"
+                },
+                "title": {
+                  "type": "string"
+                },
+                "description": {
+                  "type": "string"
+                },
+                "potentialSavings": {
+                  "type": "number"
+                },
+                "difficulty": {
+                  "type": "string",
+                  "enum": [
+                    "easy",
+                    "medium",
+                    "hard"
+                  ]
+                },
+                "priority": {
+                  "type": "number",
+                  "minimum": 1,
+                  "maximum": 10
+                },
+                "actionSteps": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "reasoning": {
+                  "type": "string"
+                },
+                "confidence": {
+                  "type": "number",
+                  "minimum": 0,
+                  "maximum": 1
+                }
+              }
+            }
+          },
+          "totalPotentialSavings": {
+            "type": "number"
+          }
+        }
+      },
+      "calculate_investment_readiness_input": {
+        "type": "object",
+        "properties": {
+          "userId": {
+            "type": "string",
+            "description": "User identifier"
+          },
+          "monthlyIncome": {
+            "type": "number",
+            "description": "Monthly income amount"
+          },
+          "monthlyExpenses": {
+            "type": "number",
+            "description": "Monthly expenses amount"
+          },
+          "emergencyFund": {
+            "type": "number",
+            "description": "Current emergency fund amount"
+          },
+          "debts": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "type": {
+                  "type": "string"
+                },
+                "amount": {
+                  "type": "number"
+                },
+                "interestRate": {
+                  "type": "number"
+                }
+              }
+            }
+          }
+        },
+        "required": [
+          "userId",
+          "monthlyIncome",
+          "monthlyExpenses"
+        ]
+      },
+      "calculate_investment_readiness_output": {
+        "type": "object",
+        "properties": {
+          "readinessScore": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 100
+          },
+          "readinessLevel": {
+            "type": "string",
+            "enum": [
+              "not_ready",
+              "building_foundation",
+              "ready_to_learn"
+            ]
+          },
+          "recommendations": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "priority": {
+                  "type": "string",
+                  "enum": [
+                    "high",
+                    "medium",
+                    "low"
+                  ]
+                },
+                "action": {
+                  "type": "string"
+                },
+                "description": {
+                  "type": "string"
+                },
+                "educationalResources": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          },
+          "disclaimer": {
+            "type": "string",
+            "const": "This is educational information only, not financial advice. Consult a licensed financial advisor before making investment decisions."
+          }
+        }
+      }
+    }
+  }
+}

@@ -11,11 +11,11 @@
  */
 
 import { APIGatewayProxyEvent, APIGatewayProxyResult, Context } from 'aws-lambda';
-import { parseTransactionCSV } from '../../utils/csv-parser';
-import { batchCreateTransactions, getTransactionsByDateRange } from '../../database/transactions';
-import { getWeeklyInsightsForUser, getLatestWeeklyInsight } from '../../database/weekly-insights';
-import { getUserProfile, createUserProfile } from '../../database/user-profiles';
-import { UserProfile } from '../../types';
+import { parseTransactionCSV } from './utils/csv-parser';
+import { batchCreateTransactions, getTransactionsByDateRange } from './database/transactions';
+import { getWeeklyInsightsForUser, getLatestWeeklyInsight } from './database/weekly-insights';
+import { getUserProfile, createUserProfile } from './database/user-profiles';
+import { UserProfile } from './types';
 import { randomUUID } from 'crypto';
 
 interface APIResponse {
@@ -65,19 +65,20 @@ export const handler = async (
       case httpMethod === 'POST' && path === '/users':
         return await handleCreateUser(event);
 
-      case httpMethod === 'GET' && path.startsWith('/users/'):
-        return await handleGetUser(pathParameters?.userId);
-
-      // Transaction management
+      // Transaction management (check before generic user routes)
       case httpMethod === 'POST' && path === '/transactions/upload':
         return await handleCSVUpload(event);
 
       case httpMethod === 'GET' && path.startsWith('/users/') && path.includes('/transactions'):
         return await handleGetTransactions(pathParameters?.userId, queryStringParameters as Record<string, string> | null);
 
-      // Insights
+      // Insights (check before generic user routes)
       case httpMethod === 'GET' && path.startsWith('/users/') && path.includes('/insights'):
         return await handleGetInsights(pathParameters?.userId, queryStringParameters as Record<string, string> | null);
+
+      // Generic user route (must be after specific routes)
+      case httpMethod === 'GET' && path.startsWith('/users/') && !path.includes('/transactions') && !path.includes('/insights'):
+        return await handleGetUser(pathParameters?.userId);
 
       // Generate insights (trigger weekly insights generator)
       case httpMethod === 'POST' && path.startsWith('/users/') && path.includes('/insights/generate'):

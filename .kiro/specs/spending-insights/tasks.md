@@ -10,7 +10,7 @@
   - Monitor approval status daily
   - _Requirements: 7.1_
 
-- [ ] 0.2 Verify AWS account setup and quotas
+- [x] 0.2 Verify AWS account setup and quotas
   - Activate AWS credit codes and confirm $100 credit applied
   - Check AWS Billing dashboard for credit status
   - Verify Bedrock TPS, Lambda concurrency (≥20), API Gateway burst limits
@@ -117,7 +117,7 @@
 
 ### Days 8-9: AgentCore Integration (CRITICAL PATH)
 
-- [ ] 6. Deploy Lambda functions to AWS
+- [x] 6. Deploy Lambda functions to AWS
   - Deploy all 3 Lambda functions with proper IAM roles
   - Configure API Gateway for REST endpoints
   - Test deployed functions with sample data

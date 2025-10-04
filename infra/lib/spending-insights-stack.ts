@@ -4,6 +4,8 @@ import * as dynamodb from 'aws-cdk-lib/aws-dynamodb';
 import * as s3 from 'aws-cdk-lib/aws-s3';
 import * as lambda from 'aws-cdk-lib/aws-lambda';
 import * as iam from 'aws-cdk-lib/aws-iam';
+import * as apigateway from 'aws-cdk-lib/aws-apigateway';
+import * as path from 'path';
 
 export class SpendingInsightsStack extends cdk.Stack {
   constructor(scope: Construct, id: string, props?: cdk.StackProps) {
@@ -94,25 +96,29 @@ export class SpendingInsightsStack extends cdk.Stack {
       ],
     }));
 
-    // Lambda Function Skeletons
+    // Environment variables for Lambda functions
+    const lambdaEnvironment = {
+      USER_PROFILES_TABLE: userProfilesTable.tableName,
+      TRANSACTIONS_TABLE: transactionsTable.tableName,
+      WEEKLY_INSIGHTS_TABLE: weeklyInsightsTable.tableName,
+      AGENT_MEMORY_TABLE: agentMemoryTable.tableName,
+      DATA_BUCKET: dataBucket.bucketName,
+      MODEL_MODE: 'mock', // Set to 'bedrock' when ready for real AI calls
+      AWS_NODEJS_CONNECTION_REUSE_ENABLED: '1'
+    };
+
+    // Lambda Functions with actual code
     
     // Transaction Processor Lambda
     const transactionProcessorLambda = new lambda.Function(this, 'TransactionProcessorLambda', {
       functionName: 'spending-insights-transaction-processor',
       runtime: lambda.Runtime.NODEJS_20_X,
       handler: 'index.handler',
-      code: lambda.Code.fromInline(`
-        exports.handler = async (event) => {
-          console.log('Transaction Processor Lambda - Event:', JSON.stringify(event, null, 2));
-          return {
-            statusCode: 200,
-            body: JSON.stringify({ message: 'Transaction processor placeholder' })
-          };
-        };
-      `),
+      code: lambda.Code.fromAsset(path.join(__dirname, '../../src/lambda/transaction-processor')),
       role: lambdaRole,
       timeout: cdk.Duration.seconds(30),
       memorySize: 512,
+      environment: lambdaEnvironment,
     });
 
     // Weekly Insights Generator Lambda
@@ -120,18 +126,11 @@ export class SpendingInsightsStack extends cdk.Stack {
       functionName: 'spending-insights-weekly-generator',
       runtime: lambda.Runtime.NODEJS_20_X,
       handler: 'index.handler',
-      code: lambda.Code.fromInline(`
-        exports.handler = async (event) => {
-          console.log('Weekly Insights Generator Lambda - Event:', JSON.stringify(event, null, 2));
-          return {
-            statusCode: 200,
-            body: JSON.stringify({ message: 'Weekly insights generator placeholder' })
-          };
-        };
-      `),
+      code: lambda.Code.fromAsset(path.join(__dirname, '../../src/lambda/weekly-insights-generator')),
       role: lambdaRole,
       timeout: cdk.Duration.seconds(30),
       memorySize: 512,
+      environment: lambdaEnvironment,
     });
 
     // API Handler Lambda
@@ -139,25 +138,72 @@ export class SpendingInsightsStack extends cdk.Stack {
       functionName: 'spending-insights-api-handler',
       runtime: lambda.Runtime.NODEJS_20_X,
       handler: 'index.handler',
-      code: lambda.Code.fromInline(`
-        exports.handler = async (event) => {
-          console.log('API Handler Lambda - Event:', JSON.stringify(event, null, 2));
-          return {
-            statusCode: 200,
-            headers: {
-              'Content-Type': 'application/json',
-              'Access-Control-Allow-Origin': '*',
-            },
-            body: JSON.stringify({ message: 'API handler placeholder' })
-          };
-        };
-      `),
+      code: lambda.Code.fromAsset(path.join(__dirname, '../../src/lambda/api-handler')),
       role: lambdaRole,
       timeout: cdk.Duration.seconds(25), // Leave buffer for API Gateway
       memorySize: 512,
+      environment: lambdaEnvironment,
+    });
+
+    // API Gateway
+    const api = new apigateway.RestApi(this, 'SpendingInsightsApi', {
+      restApiName: 'Spending Insights API',
+      description: 'API for the Spending Insights AI Agent',
+      defaultCorsPreflightOptions: {
+        allowOrigins: apigateway.Cors.ALL_ORIGINS,
+        allowMethods: apigateway.Cors.ALL_METHODS,
+        allowHeaders: ['Content-Type', 'X-Amz-Date', 'Authorization', 'X-Api-Key', 'X-Amz-Security-Token'],
+      },
+    });
+
+    // API Gateway Lambda Integration
+    const apiIntegration = new apigateway.LambdaIntegration(apiHandlerLambda, {
+      requestTemplates: { 'application/json': '{ "statusCode": "200" }' },
+    });
+
+    // API Routes
+    
+    // Health endpoints
+    const healthResource = api.root.addResource('health');
+    healthResource.addMethod('GET', apiIntegration);
+    
+    const readinessResource = api.root.addResource('readiness');
+    readinessResource.addMethod('GET', apiIntegration);
+
+    // User management
+    const usersResource = api.root.addResource('users');
+    usersResource.addMethod('POST', apiIntegration); // Create user
+    
+    const userResource = usersResource.addResource('{userId}');
+    userResource.addMethod('GET', apiIntegration); // Get user profile
+
+    // Transaction management
+    const transactionsResource = api.root.addResource('transactions');
+    const uploadResource = transactionsResource.addResource('upload');
+    uploadResource.addMethod('POST', apiIntegration); // CSV upload
+
+    const userTransactionsResource = userResource.addResource('transactions');
+    userTransactionsResource.addMethod('GET', apiIntegration); // Get user transactions
+
+    // Insights
+    const userInsightsResource = userResource.addResource('insights');
+    userInsightsResource.addMethod('GET', apiIntegration); // Get insights
+    
+    const generateInsightsResource = userInsightsResource.addResource('generate');
+    generateInsightsResource.addMethod('POST', apiIntegration); // Generate insights
+
+    // Grant API Gateway permission to invoke Lambda
+    apiHandlerLambda.addPermission('ApiGatewayInvoke', {
+      principal: new iam.ServicePrincipal('apigateway.amazonaws.com'),
+      sourceArn: api.arnForExecuteApi(),
     });
 
     // Outputs
+    new cdk.CfnOutput(this, 'ApiGatewayUrl', {
+      value: api.url,
+      description: 'API Gateway endpoint URL',
+    });
+
     new cdk.CfnOutput(this, 'DataBucketName', {
       value: dataBucket.bucketName,
       description: 'S3 bucket for CSV uploads and processed data',
@@ -181,6 +227,21 @@ export class SpendingInsightsStack extends cdk.Stack {
     new cdk.CfnOutput(this, 'AgentMemoryTableName', {
       value: agentMemoryTable.tableName,
       description: 'DynamoDB table for agent memory',
+    });
+
+    new cdk.CfnOutput(this, 'TransactionProcessorLambdaArn', {
+      value: transactionProcessorLambda.functionArn,
+      description: 'Transaction Processor Lambda function ARN',
+    });
+
+    new cdk.CfnOutput(this, 'WeeklyInsightsLambdaArn', {
+      value: weeklyInsightsLambda.functionArn,
+      description: 'Weekly Insights Generator Lambda function ARN',
+    });
+
+    new cdk.CfnOutput(this, 'ApiHandlerLambdaArn', {
+      value: apiHandlerLambda.functionArn,
+      description: 'API Handler Lambda function ARN',
     });
   }
 }

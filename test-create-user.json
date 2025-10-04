@@ -1,0 +1,6 @@
+{
+  "email": "test@example.com",
+  "name": "Test User",
+  "financialGoals": ["save_money", "reduce_fees"],
+  "riskTolerance": "medium"
+}

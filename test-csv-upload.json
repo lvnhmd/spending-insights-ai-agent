@@ -1,0 +1,4 @@
+{
+  "userId": "4286935d-f580-4882-921a-cc0821d13953",
+  "csvContent": "date,description,amount,account,category\n01/15/2024,Starbucks Coffee #1234,-4.95,Checking,Food & Dining\n01/15/2024,Amazon Prime Subscription,-14.99,Credit Card,Shopping\n01/16/2024,Salary Deposit,2500.00,Checking,Income\n01/16/2024,Grocery Store Purchase,-67.43,Debit Card,Groceries\n01/17/2024,Netflix Subscription,-15.99,Credit Card,Entertainment"
+}

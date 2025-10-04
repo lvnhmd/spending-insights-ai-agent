@@ -10,9 +10,9 @@
  */
 
 import { Context } from 'aws-lambda';
-import { getTransactionsByWeek } from '../../database/transactions';
-import { createWeeklyInsight, getWeeklyInsight } from '../../database/weekly-insights';
-import { Transaction, WeeklyInsight, Recommendation, CategorySpending } from '../../types';
+import { getTransactionsByWeek } from './database/transactions';
+import { createWeeklyInsight, getWeeklyInsight } from './database/weekly-insights';
+import { Transaction, WeeklyInsight, Recommendation, CategorySpending } from './types';
 import { randomUUID } from 'crypto';
 
 interface WeeklyInsightsEvent {

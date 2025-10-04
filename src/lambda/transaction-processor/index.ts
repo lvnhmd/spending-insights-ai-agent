@@ -10,9 +10,9 @@
  */
 
 import { APIGatewayProxyEvent, APIGatewayProxyResult, Context } from 'aws-lambda';
-import { parseTransactionCSV } from '../../utils/csv-parser';
-import { batchCreateTransactions } from '../../database/transactions';
-import { Transaction } from '../../types';
+import { parseTransactionCSV } from './utils/csv-parser';
+import { batchCreateTransactions } from './database/transactions';
+import { Transaction } from './types';
 
 // Mock responses for testing
 const MOCK_CATEGORIZATION_RESPONSE = {

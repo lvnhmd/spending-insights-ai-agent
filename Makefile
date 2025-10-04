@@ -9,8 +9,12 @@ install:
 bootstrap:
 	cd infra && npx cdk bootstrap
 
+# Build Lambda functions
+build-lambdas:
+	npx ts-node --project scripts/tsconfig.json scripts/build-lambdas.ts
+
 # Deploy all infrastructure
-deploy:
+deploy: build-lambdas
 	cd infra && npm run build && npx cdk deploy --all --require-approval never
 
 # Destroy all infrastructure

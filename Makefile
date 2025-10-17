@@ -48,3 +48,41 @@ validate-db:
 # Test database with sample data (requires deployed tables)
 test-db-integration:
 	npx ts-node --project scripts/tsconfig.json scripts/test-database-operations.ts
+
+# AgentCore Management Commands
+
+# Upload action group schema to S3
+upload-schema:
+	npx ts-node --project scripts/tsconfig.json scripts/upload-agent-schema.ts
+
+# Register Bedrock Agent with AgentCore
+register-agent:
+	npx ts-node --project scripts/tsconfig.json scripts/register-agent.ts
+
+# Test AgentCore memory management
+test-memory:
+	npx ts-node --project scripts/tsconfig.json scripts/test-memory-management.ts
+
+# Full AgentCore setup (upload schema + register agent)
+setup-agentcore: upload-schema register-agent
+	@echo "✅ AgentCore setup completed"
+
+# Test AgentCore integration end-to-end
+test-agentcore: test-memory
+	@echo "✅ AgentCore testing completed"
+
+# Generate demo traces for documentation
+generate-demo-traces:
+	npx ts-node --project scripts/tsconfig.json scripts/generate-demo-traces.ts
+
+# Validate complete AgentCore integration
+validate-agentcore:
+	npx ts-node --project scripts/tsconfig.json scripts/validate-agentcore-integration.ts
+
+# Test external API integrations
+test-external-apis:
+	npx ts-node --project scripts/tsconfig.json scripts/test-external-apis.ts
+
+# Complete AgentCore demo preparation
+prepare-demo: setup-agentcore validate-agentcore generate-demo-traces test-external-apis
+	@echo "🎬 Demo preparation completed - ready for presentation"

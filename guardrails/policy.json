@@ -1,12 +1,18 @@
 {
   "name": "SpendingInsightsGuardrails",
-  "description": "PII redaction and financial advice protection",
+  "description": "Comprehensive PII redaction and financial advice protection for spending insights AI agent",
+  "version": "1.0",
   "contentPolicyConfig": {
     "filtersConfig": [
       {
         "type": "PROMPT_ATTACK",
         "inputStrength": "HIGH",
-        "outputStrength": "NONE"
+        "outputStrength": "HIGH"
+      },
+      {
+        "type": "JAILBREAK",
+        "inputStrength": "HIGH",
+        "outputStrength": "HIGH"
       }
     ]
   },
@@ -14,21 +20,106 @@
     "piiEntitiesConfig": [
       { "type": "CREDIT_DEBIT_CARD_NUMBER", "action": "BLOCK" },
       { "type": "US_BANK_ACCOUNT_NUMBER", "action": "ANONYMIZE" },
+      { "type": "US_BANK_ROUTING_NUMBER", "action": "ANONYMIZE" },
       { "type": "EMAIL", "action": "ANONYMIZE" },
-      { "type": "PHONE", "action": "ANONYMIZE" }
+      { "type": "PHONE", "action": "ANONYMIZE" },
+      { "type": "US_SOCIAL_SECURITY_NUMBER", "action": "BLOCK" },
+      { "type": "ADDRESS", "action": "ANONYMIZE" },
+      { "type": "NAME", "action": "ANONYMIZE" },
+      { "type": "DATE_OF_BIRTH", "action": "ANONYMIZE" },
+      { "type": "DRIVER_ID", "action": "ANONYMIZE" },
+      { "type": "US_PASSPORT_NUMBER", "action": "BLOCK" }
+    ],
+    "regexesConfig": [
+      {
+        "name": "IBAN",
+        "description": "International Bank Account Number",
+        "pattern": "[A-Z]{2}[0-9]{2}[A-Z0-9]{4}[0-9]{7}([A-Z0-9]?){0,16}",
+        "action": "ANONYMIZE"
+      },
+      {
+        "name": "SWIFT_CODE",
+        "description": "SWIFT/BIC codes",
+        "pattern": "[A-Z]{6}[A-Z0-9]{2}([A-Z0-9]{3})?",
+        "action": "ANONYMIZE"
+      }
     ]
   },
   "topicPolicyConfig": {
     "topicsConfig": [
       {
-        "name": "FinancialAdvice",
-        "definition": "Prescriptive investment recommendations or specific securities advice",
+        "name": "PrescriptiveFinancialAdvice",
+        "definition": "Specific investment recommendations, definitive financial advice, or prescriptive actions regarding securities, funds, or financial products",
         "examples": [
           "You should buy Tesla stock",
           "I recommend investing in Bitcoin",
-          "Put 60% in S&P 500 index fund"
+          "Put 60% in S&P 500 index fund",
+          "Buy this ETF now",
+          "Sell your Apple shares",
+          "Invest in real estate immediately",
+          "You must diversify into bonds",
+          "Purchase cryptocurrency today"
         ],
         "type": "DENY"
+      },
+      {
+        "name": "SpecificSecuritiesRecommendations",
+        "definition": "Recommendations for specific stocks, bonds, funds, or other securities by name or ticker symbol",
+        "examples": [
+          "Buy AAPL stock",
+          "Invest in VTSAX",
+          "Purchase SPY ETF",
+          "Consider TSLA calls",
+          "Short NVDA",
+          "Buy Treasury bonds",
+          "Invest in Berkshire Hathaway"
+        ],
+        "type": "DENY"
+      },
+      {
+        "name": "DefinitiveFinancialGuidance",
+        "definition": "Absolute statements about what users should do with their money without appropriate disclaimers",
+        "examples": [
+          "You should allocate 20% to stocks",
+          "Always keep 6 months emergency fund",
+          "Never invest in individual stocks",
+          "You must pay off debt first",
+          "Definitely refinance your mortgage"
+        ],
+        "type": "DENY"
+      }
+    ]
+  },
+  "wordPolicyConfig": {
+    "wordsConfig": [
+      {
+        "text": "financial advice"
+      },
+      {
+        "text": "investment recommendation"
+      },
+      {
+        "text": "buy this stock"
+      },
+      {
+        "text": "sell immediately"
+      }
+    ],
+    "managedWordListsConfig": [
+      {
+        "type": "PROFANITY"
+      }
+    ]
+  },
+  "contextualGroundingPolicyConfig": {
+    "filtersConfig": [
+      {
+        "type": "GROUNDING",
+        "threshold": 0.75
+      },
+      {
+        "type": "RELEVANCE",
+        "threshold": 0.75
       }
     ]
   }

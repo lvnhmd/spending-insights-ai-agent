@@ -68,27 +68,37 @@ export interface AgentMemory {
 }
 
 export interface ConversationTurn {
+  id: string;
+  type: 'user_input' | 'agent_response' | 'tool_execution' | 'memory_entry';
   timestamp: Date;
-  userInput?: string;
-  agentResponse: string;
-  context: Record<string, any>;
+  content: any;
+  metadata?: {
+    sessionId?: string;
+    source?: string;
+    confidence?: number;
+    [key: string]: any;
+  };
 }
 
 export interface UserPreference {
-  key: string;
+  id: string;
+  type: string;
   value: any;
   confidence: number;
-  learnedAt: Date;
-  source: 'explicit' | 'inferred';
+  source: string;
+  createdAt: Date;
+  updatedAt: Date;
 }
 
 export interface CategoryMapping {
-  merchantPattern: string;
+  id: string;
+  pattern: string;
   category: string;
   subcategory?: string;
   confidence: number;
-  learnedFrom: 'user' | 'ai' | 'rules';
+  source: string;
   createdAt: Date;
+  updatedAt: Date;
 }
 
 // CSV Processing Types

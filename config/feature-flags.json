@@ -1,0 +1,11 @@
+{
+  "USE_CACHED_APIS": true,
+  "MODEL_TIER": "haiku",
+  "ENABLE_PLAID": false,
+  "ENABLE_ALPHA_VANTAGE": true,
+  "ENABLE_FRED": false,
+  "CACHE_DIRECTORY": "./cache",
+  "API_TIMEOUT_MS": 5000,
+  "MAX_RETRIES": 3,
+  "DEMO_MODE": true
+}

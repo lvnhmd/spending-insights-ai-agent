@@ -124,14 +124,14 @@
   - Verify CloudWatch logging and monitoring
   - _Requirements: 7.6, 8.1_
 
-- [ ] 7. Configure Bedrock AgentCore (HIGH RISK - ALLOW EXTRA TIME)
-  - [ ] 7.1 Set up Memory Management primitive
+- [x] 7. Configure Bedrock AgentCore (HIGH RISK - ALLOW EXTRA TIME)
+  - [x] 7.1 Set up Memory Management primitive
     - Configure AgentCore with session context persistence in DynamoDB
     - Set up memory management for user preferences and learning data
     - Test memory persistence across agent sessions
     - _Requirements: 7.2, 7.3, 8.6_
 
-  - [ ] 7.2 Create Action Groups for Tool Orchestration with 5 specific tools
+  - [x] 7.2 Create Action Groups for Tool Orchestration with 5 specific tools
     - Define 5 agent tools: analyze_spending_patterns, categorize_transactions, detect_fees_and_subscriptions, generate_savings_recommendations, calculate_investment_readiness
     - Configure Action Groups in AgentCore console pointing to Lambda /tools/ endpoints
     - Commit OpenAPI/JSON schema used for registration under /infra/agent/
@@ -141,7 +141,7 @@
 
 ### Days 10-11: Autonomous Operation + Security
 
-- [ ] 8. Implement autonomous operation with EventBridge Scheduler (timezone-aware)
+- [x] 8. Implement autonomous operation with EventBridge Scheduler (timezone-aware)
   - Configure EventBridge Scheduler: cron(0 6 ? * SUN *) with timezone Europe/Sofia
   - Connect to weekly-insights-generator Lambda with proper IAM role
   - Add "Last autonomous run" tracking in DynamoDB for UI display
@@ -149,14 +149,14 @@
   - Enable X-Ray tracing on api-handler Lambda
   - _Requirements: 2.1, 7.5, 8.6_
 
-- [ ] 8.5 Autonomous operation testing strategy (TIMING CRITICAL)
+- [x] 8.5 Autonomous operation testing strategy (TIMING CRITICAL)
   - **If reached by Saturday**: Configure for Sunday 6 AM and verify Monday morning
   - **If behind schedule**: Manually trigger via AWS Console and show EventBridge config
   - **Backup**: Show CloudWatch Events logs from test invocation
   - Document EventBridge rule clearly for judges to verify autonomy capability
   - _Requirements: 7.5, 8.6_
 
-- [ ] 9. Create Bedrock Guardrails for security and compliance
+- [x] 9. Create Bedrock Guardrails for security and compliance
   - Set up Bedrock Guardrails for PII redaction and financial advice protection
   - Configure content filtering for sensitive information and prescriptive language
   - Test guardrails effectiveness with sample sensitive data
@@ -165,7 +165,7 @@
 
 ### Day 12: External APIs (Minimal Implementation)
 
-- [ ] 10. Add external API integrations with S3-cached responses
+- [x] 10. Add external API integrations with S3-cached responses
   - Set up Plaid sandbox with cached response in /cache/plaid/transactions.json
   - Integrate Alpha Vantage API with cached responses in /cache/alpha_vantage/AAPL_daily.json
   - Add feature flags: USE_CACHED_APIS=true, MODEL_TIER=haiku|sonnet, ENABLE_PLAID=false
@@ -175,7 +175,7 @@
 
 ### Day 13: UI + Optional Enhancements (Fast Build)
 
-- [ ] 11. Build minimal Next.js App Router web application
+- [x] 11. Build minimal Next.js App Router web application
   - Create Next.js App Router with /app/(routes)/upload for CSV, /app/insights for results
   - Build insights display with "Why this recommendation?" explanation cards
   - Implement "Last autonomous run" badge: "Last autonomous run: • 3 recs • 7.2s" (read from DDB)

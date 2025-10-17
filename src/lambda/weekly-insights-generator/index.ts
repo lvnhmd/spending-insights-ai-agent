@@ -7,18 +7,23 @@
  * - Recommendation generation with impact vs effort prioritization
  * - Post-hoc explanation generation for transparency
  * - Savings calculations and actionable step guidance
+ * - Autonomous operation with EventBridge Scheduler
  */
 
 import { Context } from 'aws-lambda';
 import { getTransactionsByWeek } from './database/transactions';
 import { createWeeklyInsight, getWeeklyInsight } from './database/weekly-insights';
+import { startAutonomousRun, completeAutonomousRun, failAutonomousRun } from './database/autonomous-runs';
 import { Transaction, WeeklyInsight, Recommendation, CategorySpending } from './types';
 import { randomUUID } from 'crypto';
 
 interface WeeklyInsightsEvent {
-  userId: string;
+  userId?: string;
   weekOf?: string; // ISO date string, defaults to current week
   forceRegenerate?: boolean;
+  source?: 'autonomous-scheduler' | 'manual' | 'api';
+  runType?: string;
+  timestamp?: string;
 }
 
 interface SpendingPattern {
@@ -45,97 +50,193 @@ export const handler = async (
 ): Promise<any> => {
   console.log('Weekly Insights Generator Lambda - Event:', JSON.stringify(event, null, 2));
 
+  const startTime = Date.now();
+
   try {
-    const { userId, weekOf, forceRegenerate = false } = event;
+    const { userId, weekOf, forceRegenerate = false, source, runType, timestamp } = event;
 
+    // Handle autonomous scheduler invocation (process all users)
+    if (source === 'autonomous-scheduler') {
+      return await handleAutonomousRun(event, startTime);
+    }
+
+    // Handle single user invocation
     if (!userId) {
-      throw new Error('userId is required');
+      throw new Error('userId is required for single user processing');
     }
 
-    // Determine the week to analyze
-    const weekDate = weekOf ? new Date(weekOf) : new Date();
-    const weekKey = getISOWeekKey(weekDate);
-
-    // Check if insights already exist for this week
-    if (!forceRegenerate) {
-      const existingInsights = await getWeeklyInsight(userId, weekDate);
-      if (existingInsights) {
-        console.log('Returning existing insights for week:', weekKey);
-        return {
-          success: true,
-          insights: existingInsights,
-          generated: false,
-          message: 'Existing insights returned'
-        };
-      }
-    }
-
-    // Get transactions for the week
-    const transactions = await getTransactionsByWeek(userId, weekDate);
-    
-    if (transactions.length === 0) {
-      console.log('No transactions found for week:', weekKey);
-      return {
-        success: false,
-        message: 'No transactions found for the specified week',
-        weekKey
-      };
-    }
-
-    console.log(`Analyzing ${transactions.length} transactions for week ${weekKey}`);
-
-    // Analyze spending patterns
-    const spendingPatterns = await analyzeSpendingPatterns(transactions, userId);
-    
-    // Calculate category spending
-    const categorySpending = calculateCategorySpending(transactions);
-    
-    // Identify savings opportunities
-    const savingsOpportunities = await identifySavingsOpportunities(transactions, spendingPatterns);
-    
-    // Generate recommendations
-    const recommendations = await generateRecommendations(savingsOpportunities, categorySpending);
-    
-    // Calculate total potential savings
-    const potentialSavings = recommendations.reduce((sum, rec) => sum + rec.potentialSavings, 0);
-    
-    // Calculate total spent
-    const totalSpent = transactions
-      .filter(t => t.transactionType === 'debit')
-      .reduce((sum, t) => sum + t.amount, 0);
-
-    // Create weekly insight
-    const weeklyInsight: WeeklyInsight = {
-      id: randomUUID(),
-      userId,
-      weekOf: weekDate,
-      totalSpent,
-      topCategories: categorySpending.slice(0, 5), // Top 5 categories
-      recommendations,
-      potentialSavings,
-      implementedActions: [], // Will be updated when user implements recommendations
-      generatedAt: new Date(),
-      weekNumber: getISOWeekNumber(weekDate),
-      year: weekDate.getFullYear()
-    };
-
-    // Store insights in database
-    await createWeeklyInsight(weeklyInsight);
-
-    console.log(`Generated insights for week ${weekKey}: ${recommendations.length} recommendations, $${potentialSavings.toFixed(2)} potential savings`);
-
-    return {
-      success: true,
-      insights: weeklyInsight,
-      generated: true,
-      message: `Generated ${recommendations.length} recommendations with $${potentialSavings.toFixed(2)} potential savings`
-    };
+    return await processUserInsights(userId, weekOf, forceRegenerate);
 
   } catch (error) {
     console.error('Weekly Insights Generator Error:', error);
+    
+    // If this was an autonomous run, mark it as failed
+    if (event.source === 'autonomous-scheduler' && event.timestamp) {
+      await failAutonomousRun(
+        'weekly-insights',
+        event.timestamp,
+        error instanceof Error ? error.message : 'Unknown error',
+        Date.now() - startTime
+      );
+    }
+    
     throw error;
   }
 };
+
+/**
+ * Handle autonomous run for all users
+ */
+async function handleAutonomousRun(event: WeeklyInsightsEvent, startTime: number): Promise<any> {
+  const runTimestamp = event.timestamp || new Date().toISOString();
+  
+  // Start tracking the autonomous run
+  const autonomousRun = await startAutonomousRun('weekly-insights', {
+    source: event.source,
+    scheduledTime: runTimestamp
+  });
+
+  try {
+    // For demo purposes, we'll process a few mock users
+    // In production, this would query all users from the user profiles table
+    const mockUsers = ['demo-user-1', 'demo-user-2', 'demo-user-3'];
+    
+    let usersProcessed = 0;
+    let totalInsights = 0;
+    let totalRecommendations = 0;
+
+    for (const userId of mockUsers) {
+      try {
+        const result = await processUserInsights(userId, event.weekOf, false);
+        if (result.success && result.generated) {
+          usersProcessed++;
+          totalInsights++;
+          totalRecommendations += result.insights?.recommendations?.length || 0;
+        }
+      } catch (userError) {
+        console.error(`Failed to process insights for user ${userId}:`, userError);
+        // Continue processing other users
+      }
+    }
+
+    // Complete the autonomous run
+    await completeAutonomousRun('weekly-insights', runTimestamp, {
+      usersProcessed,
+      insightsGenerated: totalInsights,
+      recommendationsCreated: totalRecommendations,
+      duration: Date.now() - startTime
+    });
+
+    console.log(`Autonomous run completed: ${usersProcessed} users processed, ${totalInsights} insights generated`);
+
+    return {
+      success: true,
+      autonomousRun: true,
+      usersProcessed,
+      insightsGenerated: totalInsights,
+      recommendationsCreated: totalRecommendations,
+      duration: Date.now() - startTime,
+      message: `Autonomous weekly insights generation completed for ${usersProcessed} users`
+    };
+
+  } catch (error) {
+    await failAutonomousRun(
+      'weekly-insights',
+      runTimestamp,
+      error instanceof Error ? error.message : 'Unknown error',
+      Date.now() - startTime
+    );
+    throw error;
+  }
+}
+
+/**
+ * Process insights for a single user
+ */
+async function processUserInsights(
+  userId: string,
+  weekOf?: string,
+  forceRegenerate: boolean = false
+): Promise<any> {
+  // Determine the week to analyze
+  const weekDate = weekOf ? new Date(weekOf) : new Date();
+  const weekKey = getISOWeekKey(weekDate);
+
+  // Check if insights already exist for this week
+  if (!forceRegenerate) {
+    const existingInsights = await getWeeklyInsight(userId, weekDate);
+    if (existingInsights) {
+      console.log('Returning existing insights for week:', weekKey);
+      return {
+        success: true,
+        insights: existingInsights,
+        generated: false,
+        message: 'Existing insights returned'
+      };
+    }
+  }
+
+  // Get transactions for the week
+  const transactions = await getTransactionsByWeek(userId, weekDate);
+  
+  if (transactions.length === 0) {
+    console.log('No transactions found for week:', weekKey);
+    return {
+      success: false,
+      message: 'No transactions found for the specified week',
+      weekKey
+    };
+  }
+
+  console.log(`Analyzing ${transactions.length} transactions for week ${weekKey}`);
+
+  // Analyze spending patterns
+  const spendingPatterns = await analyzeSpendingPatterns(transactions, userId);
+  
+  // Calculate category spending
+  const categorySpending = calculateCategorySpending(transactions);
+  
+  // Identify savings opportunities
+  const savingsOpportunities = await identifySavingsOpportunities(transactions, spendingPatterns);
+  
+  // Generate recommendations
+  const recommendations = await generateRecommendations(savingsOpportunities, categorySpending);
+  
+  // Calculate total potential savings
+  const potentialSavings = recommendations.reduce((sum, rec) => sum + rec.potentialSavings, 0);
+  
+  // Calculate total spent
+  const totalSpent = transactions
+    .filter(t => t.transactionType === 'debit')
+    .reduce((sum, t) => sum + t.amount, 0);
+
+  // Create weekly insight
+  const weeklyInsight: WeeklyInsight = {
+    id: randomUUID(),
+    userId,
+    weekOf: weekDate,
+    totalSpent,
+    topCategories: categorySpending.slice(0, 5), // Top 5 categories
+    recommendations,
+    potentialSavings,
+    implementedActions: [], // Will be updated when user implements recommendations
+    generatedAt: new Date(),
+    weekNumber: getISOWeekNumber(weekDate),
+    year: weekDate.getFullYear()
+  };
+
+  // Store insights in database
+  await createWeeklyInsight(weeklyInsight);
+
+  console.log(`Generated insights for week ${weekKey}: ${recommendations.length} recommendations, ${potentialSavings.toFixed(2)} potential savings`);
+
+  return {
+    success: true,
+    insights: weeklyInsight,
+    generated: true,
+    message: `Generated ${recommendations.length} recommendations with ${potentialSavings.toFixed(2)} potential savings`
+  };
+}
 
 /**
  * Analyze spending patterns and trends
@@ -239,7 +340,7 @@ async function identifySavingsOpportunities(
       difficulty: 'easy',
       category: sub.category,
       transactions: [sub],
-      reasoning: `This recurring charge of $${sub.amount} could save $${(sub.amount * 12).toFixed(2)} annually if cancelled`
+      reasoning: `This recurring charge of ${sub.amount} could save ${(sub.amount * 12).toFixed(2)} annually if cancelled`
     });
   }
 
@@ -258,7 +359,7 @@ async function identifySavingsOpportunities(
       difficulty: 'medium',
       category: fee.category,
       transactions: [fee],
-      reasoning: `Bank fees like this $${fee.amount} charge can often be avoided by changing account types or banking habits`
+      reasoning: `Bank fees like this ${fee.amount} charge can often be avoided by changing account types or banking habits`
     });
   }
 
@@ -274,7 +375,7 @@ async function identifySavingsOpportunities(
       difficulty: 'medium',
       category: pattern.category,
       transactions: categoryTransactions,
-      reasoning: `You spent $${pattern.weeklyAverage.toFixed(2)} on ${pattern.category} this week. A 20% reduction could save $${(pattern.weeklyAverage * 0.2 * 52).toFixed(2)} annually`
+      reasoning: `You spent ${pattern.weeklyAverage.toFixed(2)} on ${pattern.category} this week. A 20% reduction could save ${(pattern.weeklyAverage * 0.2 * 52).toFixed(2)} annually`
     });
   }
 
@@ -287,7 +388,7 @@ async function identifySavingsOpportunities(
       potentialSavings: duplicates.reduce((sum, t) => sum + t.amount, 0),
       difficulty: 'easy',
       transactions: duplicates,
-      reasoning: `Found ${duplicates.length} potentially duplicate transactions totaling $${duplicates.reduce((sum, t) => sum + t.amount, 0).toFixed(2)}`
+      reasoning: `Found ${duplicates.length} potentially duplicate transactions totaling ${duplicates.reduce((sum, t) => sum + t.amount, 0).toFixed(2)}`
     });
   }
 
@@ -335,12 +436,12 @@ async function generateRecommendations(
       id: randomUUID(),
       type: 'save',
       title: `Track ${topCategory.category} spending more closely`,
-      description: `You spent $${topCategory.totalAmount.toFixed(2)} on ${topCategory.category} this week (${topCategory.percentOfTotal.toFixed(1)}% of total spending). Consider setting a weekly budget for this category.`,
+      description: `You spent ${topCategory.totalAmount.toFixed(2)} on ${topCategory.category} this week (${topCategory.percentOfTotal.toFixed(1)}% of total spending). Consider setting a weekly budget for this category.`,
       potentialSavings: topCategory.totalAmount * 0.15 * 52, // 15% reduction annualized
       difficulty: 'easy',
       priority: 3,
       actionSteps: [
-        `Set a weekly budget of $${(topCategory.totalAmount * 0.85).toFixed(2)} for ${topCategory.category}`,
+        `Set a weekly budget of ${(topCategory.totalAmount * 0.85).toFixed(2)} for ${topCategory.category}`,
         'Track spending in this category daily',
         'Look for alternatives or ways to reduce costs',
         'Review progress weekly'

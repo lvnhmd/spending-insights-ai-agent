@@ -421,18 +421,51 @@ async function callBedrockForCategorization(transaction: Transaction): Promise<O
     - reasoning: brief explanation
   `;
 
-  // TODO: Implement actual Bedrock call
-  // const response = await bedrockClient.invokeModel({...});
-  
-  // For now, return mock response
-  return {
-    category: MOCK_CATEGORIZATION_RESPONSE.category,
-    subcategory: MOCK_CATEGORIZATION_RESPONSE.subcategory,
-    confidence: MOCK_CATEGORIZATION_RESPONSE.confidence,
-    isRecurring: MOCK_CATEGORIZATION_RESPONSE.isRecurring,
-    merchantName: MOCK_CATEGORIZATION_RESPONSE.merchantName,
-    reasoning: 'Mock categorization for development'
-  };
+  // Check if we should use real Bedrock or mock data
+  if (process.env.MODEL_MODE !== 'bedrock') {
+    return {
+      category: MOCK_CATEGORIZATION_RESPONSE.category,
+      subcategory: MOCK_CATEGORIZATION_RESPONSE.subcategory,
+      confidence: MOCK_CATEGORIZATION_RESPONSE.confidence,
+      isRecurring: MOCK_CATEGORIZATION_RESPONSE.isRecurring,
+      merchantName: MOCK_CATEGORIZATION_RESPONSE.merchantName,
+      reasoning: 'Mock categorization for development'
+    };
+  }
+
+  try {
+    // Import the secure Bedrock client
+    const { createSecureBedrockClient } = await import('./utils/bedrock-client');
+    const client = createSecureBedrockClient();
+    
+    const result = await client.categorizeTransaction({
+      description: transaction.description,
+      amount: transaction.amount,
+      date: transaction.date.toISOString(),
+    });
+
+    // Map the result to our expected format
+    return {
+      category: result.category,
+      subcategory: result.subcategory,
+      confidence: result.confidence,
+      isRecurring: transaction.description.toLowerCase().includes('subscription') || 
+                   transaction.description.toLowerCase().includes('monthly'),
+      merchantName: transaction.description.split(' ')[0], // Simple merchant extraction
+      reasoning: result.reasoning,
+    };
+
+  } catch (error) {
+    console.warn('Bedrock categorization with guardrails failed, using fallback:', error);
+    return {
+      category: MOCK_CATEGORIZATION_RESPONSE.category,
+      subcategory: MOCK_CATEGORIZATION_RESPONSE.subcategory,
+      confidence: MOCK_CATEGORIZATION_RESPONSE.confidence,
+      isRecurring: MOCK_CATEGORIZATION_RESPONSE.isRecurring,
+      merchantName: MOCK_CATEGORIZATION_RESPONSE.merchantName,
+      reasoning: 'Fallback categorization due to Bedrock error'
+    };
+  }
 }
 
 /**

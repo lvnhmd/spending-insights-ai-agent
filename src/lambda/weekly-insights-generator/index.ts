@@ -202,14 +202,17 @@ async function processUserInsights(
     }
   }
 
-  // Analyze spending patterns
-  const spendingPatterns = await analyzeSpendingPatterns(transactions, userId);
+  // Filter out income transactions for spending analysis
+  const expenseTransactions = transactions.filter(t => t.transactionType === 'debit');
   
-  // Calculate category spending
-  const categorySpending = calculateCategorySpending(transactions);
+  // Analyze spending patterns (expenses only)
+  const spendingPatterns = await analyzeSpendingPatterns(expenseTransactions, userId);
   
-  // Identify savings opportunities
-  const savingsOpportunities = await identifySavingsOpportunities(transactions, spendingPatterns);
+  // Calculate category spending (expenses only)
+  const categorySpending = calculateCategorySpending(expenseTransactions);
+  
+  // Identify savings opportunities (expenses only)
+  const savingsOpportunities = await identifySavingsOpportunities(expenseTransactions, spendingPatterns);
   
   // Generate recommendations
   const recommendations = await generateRecommendations(savingsOpportunities, categorySpending);
@@ -217,10 +220,10 @@ async function processUserInsights(
   // Calculate total potential savings
   const potentialSavings = recommendations.reduce((sum, rec) => sum + rec.potentialSavings, 0);
   
-  // Calculate total spent
+  // Calculate total spent (use absolute values since debit amounts are negative)
   const totalSpent = transactions
     .filter(t => t.transactionType === 'debit')
-    .reduce((sum, t) => sum + t.amount, 0);
+    .reduce((sum, t) => sum + Math.abs(t.amount), 0);
 
   // Create daily insight
   const dailyInsight: DailyInsight = {
@@ -269,7 +272,8 @@ async function analyzeSpendingPatterns(transactions: Transaction[], userId: stri
   const patterns: SpendingPattern[] = [];
 
   for (const [category, categoryTransactions] of Object.entries(categoryGroups)) {
-    const totalAmount = categoryTransactions.reduce((sum, t) => sum + t.amount, 0);
+    // Use absolute values for spending calculations
+    const totalAmount = categoryTransactions.reduce((sum, t) => sum + Math.abs(t.amount), 0);
     const weeklyAverage = totalAmount; // This week's spending
     
     // Simple trend analysis (in real implementation, would compare with historical data)
@@ -277,9 +281,9 @@ async function analyzeSpendingPatterns(transactions: Transaction[], userId: stri
     const trendPercentage = 0;
     
     // Identify unusual transactions (amounts significantly higher than average)
-    const amounts = categoryTransactions.map(t => t.amount);
+    const amounts = categoryTransactions.map(t => Math.abs(t.amount));
     const avgAmount = amounts.reduce((sum, amt) => sum + amt, 0) / amounts.length;
-    const unusualTransactions = categoryTransactions.filter(t => t.amount > avgAmount * 2);
+    const unusualTransactions = categoryTransactions.filter(t => Math.abs(t.amount) > avgAmount * 2);
 
     patterns.push({
       category,
@@ -308,9 +312,11 @@ function calculateCategorySpending(transactions: Transaction[]): CategorySpendin
           amounts: []
         };
       }
-      totals[category].totalAmount += transaction.amount;
+      // Use absolute value since debit amounts are negative
+      const amount = Math.abs(transaction.amount);
+      totals[category].totalAmount += amount;
       totals[category].transactionCount += 1;
-      totals[category].amounts.push(transaction.amount);
+      totals[category].amounts.push(amount);
     }
     return totals;
   }, {} as Record<string, { category: string; totalAmount: number; transactionCount: number; amounts: number[] }>);
@@ -347,33 +353,38 @@ async function identifySavingsOpportunities(
   );
 
   for (const sub of subscriptions) {
+    const subAmount = Math.abs(sub.amount);
     opportunities.push({
       type: 'subscription',
       description: `Review ${sub.merchantName || sub.description} subscription`,
-      potentialSavings: sub.amount * 12, // Annualized
+      potentialSavings: subAmount * 12, // Annualized
       difficulty: 'easy',
       category: sub.category,
       transactions: [sub],
-      reasoning: `This recurring charge of ${sub.amount} could save ${(sub.amount * 12).toFixed(2)} annually if cancelled`
+      reasoning: `This recurring charge of ${subAmount.toFixed(2)} could save ${(subAmount * 12).toFixed(2)} annually if cancelled`
     });
   }
 
-  // 2. Identify bank fees
+  // 2. Identify bank fees (be more specific to avoid false positives)
   const fees = transactions.filter(t => 
     t.category === 'Fees' || 
-    t.description.toLowerCase().includes('fee') ||
-    t.description.toLowerCase().includes('charge')
+    t.description.toLowerCase().includes('atm fee') ||
+    t.description.toLowerCase().includes('service charge') ||
+    t.description.toLowerCase().includes('overdraft') ||
+    t.description.toLowerCase().includes('maintenance fee') ||
+    (t.description.toLowerCase().includes('fee') && !t.description.toLowerCase().includes('coffee'))
   );
 
   for (const fee of fees) {
+    const feeAmount = Math.abs(fee.amount);
     opportunities.push({
       type: 'fee',
       description: `Eliminate ${fee.description} fee`,
-      potentialSavings: fee.amount * 12, // Assume monthly occurrence
+      potentialSavings: feeAmount * 12, // Assume monthly occurrence
       difficulty: 'medium',
       category: fee.category,
       transactions: [fee],
-      reasoning: `Bank fees like this ${fee.amount} charge can often be avoided by changing account types or banking habits`
+      reasoning: `Bank fees like this ${feeAmount.toFixed(2)} charge can often be avoided by changing account types or banking habits`
     });
   }
 
@@ -396,13 +407,14 @@ async function identifySavingsOpportunities(
   // 4. Identify duplicate or similar charges
   const duplicates = findDuplicateTransactions(transactions);
   if (duplicates.length > 0) {
+    const duplicateTotal = duplicates.reduce((sum, t) => sum + Math.abs(t.amount), 0);
     opportunities.push({
       type: 'duplicate',
       description: 'Review potential duplicate charges',
-      potentialSavings: duplicates.reduce((sum, t) => sum + t.amount, 0),
+      potentialSavings: duplicateTotal,
       difficulty: 'easy',
       transactions: duplicates,
-      reasoning: `Found ${duplicates.length} potentially duplicate transactions totaling ${duplicates.reduce((sum, t) => sum + t.amount, 0).toFixed(2)}`
+      reasoning: `Found ${duplicates.length} potentially duplicate transactions totaling ${duplicateTotal.toFixed(2)}`
     });
   }
 

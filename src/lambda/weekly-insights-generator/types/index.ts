@@ -28,6 +28,22 @@ export interface CategorySpending {
   percentOfTotal: number;
 }
 
+export interface DailyInsight {
+  id: string;
+  userId: string;
+  analysisDate: Date; // The date this analysis was generated
+  analysisStartDate: Date; // Start of the transaction period analyzed
+  analysisEndDate: Date; // End of the transaction period analyzed
+  totalSpent: number;
+  topCategories: CategorySpending[];
+  recommendations: Recommendation[];
+  potentialSavings: number;
+  implementedActions: string[];
+  generatedAt: Date;
+  transactionCount: number; // Number of transactions analyzed
+}
+
+// Keep WeeklyInsight for backward compatibility during transition
 export interface WeeklyInsight {
   id: string;
   userId: string;

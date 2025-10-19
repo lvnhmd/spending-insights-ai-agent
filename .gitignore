@@ -63,9 +63,14 @@ hackathon-dev_credentials.csv
 
 # Test files (temporary)
 test-*.json
+response*.json
 /tmp/
 *.tmp
 
 # Cache directories
 cache/
 .cache/
+
+# Lambda deployment packages
+*.zip
+function.zip

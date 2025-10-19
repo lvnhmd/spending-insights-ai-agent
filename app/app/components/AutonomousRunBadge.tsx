@@ -29,7 +29,7 @@ export function AutonomousRunBadge() {
   const fetchLatestRun = async () => {
     try {
       const response = await fetch(
-        `${process.env.NEXT_PUBLIC_API_BASE_URL || '/api'}/autonomous-runs/latest?runType=weekly-insights`
+        'https://fwp452jpah.execute-api.us-east-1.amazonaws.com/prod/autonomous-runs/latest?runType=daily-insights'
       )
       
       if (response.ok) {

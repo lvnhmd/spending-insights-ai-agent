@@ -17,7 +17,7 @@ export const docClient = DynamoDBDocumentClient.from(client, {
   marshallOptions: {
     convertEmptyValues: false,
     removeUndefinedValues: true,
-    convertClassInstanceToMap: false,
+    convertClassInstanceToMap: true, // Allow Date objects to be converted
   },
   unmarshallOptions: {
     wrapNumbers: false,

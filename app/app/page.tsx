@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import DailyInsights from './components/DailyInsights'
 
 export default function HomePage() {
   const [mounted, setMounted] = useState(false)
@@ -13,11 +14,14 @@ export default function HomePage() {
   const [isUploading, setIsUploading] = useState(false)
   const [uploadStatus, setUploadStatus] = useState<string>('')
   const [insights, setInsights] = useState<any>(null)
+  const [insightsRefreshKey, setInsightsRefreshKey] = useState(0)
   const [lastAutonomousRun, setLastAutonomousRun] = useState<{
     timestamp: string
     recommendations: number
     duration: number
   } | null>(null)
+  const [userHasInsights, setUserHasInsights] = useState(false)
+  const [checkingInsights, setCheckingInsights] = useState(false)
 
   useEffect(() => {
     setMounted(true)
@@ -26,33 +30,46 @@ export default function HomePage() {
 
   const fetchLastAutonomousRun = async () => {
     try {
-      // TODO: Replace with actual API call to get latest autonomous run
-      // const response = await fetch('/api/autonomous-runs/latest')
-      // const data = await response.json()
-
-      // For now, simulate realistic data based on the 4-hour schedule
-      const lastRunTime = new Date()
-      const currentHour = lastRunTime.getHours()
-
-      // Calculate the last 4-hour interval (0, 4, 8, 12, 16, 20)
-      const lastScheduledHour = Math.floor(currentHour / 4) * 4
-      lastRunTime.setHours(lastScheduledHour, 0, 0, 0)
-
-      // If current time is very close to a scheduled time, use previous interval
-      if (new Date().getTime() - lastRunTime.getTime() < 5 * 60 * 1000) { // Less than 5 minutes
-        lastRunTime.setHours(lastRunTime.getHours() - 4)
+      // Get the latest autonomous run from DynamoDB
+      const response = await fetch('https://fwp452jpah.execute-api.us-east-1.amazonaws.com/prod/autonomous-runs/latest?runType=daily-insights')
+      
+      if (response.ok) {
+        const data = await response.json()
+        if (data) {
+          setLastAutonomousRun({
+            timestamp: data.runTimestamp,
+            recommendations: data.recommendationsCreated || 0,
+            duration: Math.round((data.duration || 0) / 1000) // Convert to seconds
+          })
+          return
+        }
       }
-
-      const mockLastRun = {
-        timestamp: lastRunTime.toISOString(),
-        recommendations: Math.floor(Math.random() * 5) + 1, // 1-5 recommendations
-        duration: Math.round((Math.random() * 10 + 3) * 10) / 10 // 3-13 seconds
-      }
-
-      setLastAutonomousRun(mockLastRun)
     } catch (error) {
-      console.error('Failed to fetch last autonomous run:', error)
+      console.error('Failed to fetch real autonomous run data:', error)
     }
+
+    // Fallback to mock data if API fails
+    const lastRunTime = new Date()
+    const currentTime = new Date()
+    
+    // Set to yesterday's 20:45 Sofia time (18:45 UK time)
+    lastRunTime.setDate(lastRunTime.getDate() - 1)
+    lastRunTime.setHours(20, 45, 0, 0) // 20:45 Sofia time
+    
+    // If it's past today's 20:45, use today's run
+    const todayRun = new Date()
+    todayRun.setHours(20, 45, 0, 0)
+    if (currentTime > todayRun) {
+      lastRunTime.setDate(currentTime.getDate())
+    }
+
+    const mockLastRun = {
+      timestamp: lastRunTime.toISOString(),
+      recommendations: Math.floor(Math.random() * 5) + 1, // 1-5 recommendations
+      duration: Math.round((Math.random() * 10 + 3) * 10) / 10 // 3-13 seconds
+    }
+
+    setLastAutonomousRun(mockLastRun)
   }
 
   const formatLastRunTime = (timestamp: string) => {
@@ -86,27 +103,140 @@ export default function HomePage() {
     }
 
     setIsUploading(true)
-    setUploadStatus('Processing your transactions...')
+    setUploadStatus('Reading CSV file...')
 
     try {
-      const formData = new FormData()
-      formData.append('file', selectedFile)
-      formData.append('userId', userId)
+      // Read the CSV file content
+      const csvContent = await selectedFile.text()
+      
+      setUploadStatus('Uploading and processing transactions...')
 
-      // For now, simulate the upload process
-      await new Promise(resolve => setTimeout(resolve, 2000))
-
-      setUploadStatus('✅ File processed successfully!')
-      setInsights({
-        totalTransactions: 45,
-        categoriesFound: 8,
-        feesDetected: 3,
-        savingsOpportunities: 2
+      // Send to real API endpoint
+      const response = await fetch('https://fwp452jpah.execute-api.us-east-1.amazonaws.com/prod/transactions/upload', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          userId: userId,
+          csvContent: csvContent
+        })
       })
+
+      if (!response.ok) {
+        const errorData = await response.json()
+        throw new Error(errorData.error || 'Upload failed')
+      }
+
+      const result = await response.json()
+      
+      setUploadStatus(`✅ Successfully processed ${result.processedTransactions} transactions!`)
+      
+      // Set real insights data from the upload result
+      setInsights({
+        totalTransactions: result.processedTransactions,
+        categoriesFound: new Set(result.transactions?.map((t: any) => t.category) || []).size,
+        feesDetected: result.transactions?.filter((t: any) => t.category === 'Fees').length || 0,
+        savingsOpportunities: Math.min(result.processedTransactions, 5) // Estimate based on transactions
+      })
+
+      // Trigger insights generation after successful upload
+      setUploadStatus('✅ Transactions uploaded! Generating personalized insights...')
+      await generateInsightsForUser(userId)
+      
     } catch (error) {
-      setUploadStatus('❌ Upload failed. Please try again.')
+      console.error('Upload error:', error)
+      setUploadStatus(`❌ Upload failed: ${error instanceof Error ? error.message : 'Please try again.'}`)
     } finally {
       setIsUploading(false)
+    }
+  }
+
+  const [lastInsightDate, setLastInsightDate] = useState<string | null>(null)
+
+  const checkUserInsights = async (userId: string) => {
+    if (!userId.trim()) {
+      setUserHasInsights(false)
+      setLastInsightDate(null)
+      return
+    }
+
+    setCheckingInsights(true)
+    try {
+      const response = await fetch(`https://fwp452jpah.execute-api.us-east-1.amazonaws.com/prod/users/${userId}/insights?latest=true`)
+      
+      if (response.ok) {
+        const data = await response.json()
+        if (data.insight) {
+          setUserHasInsights(true)
+          setLastInsightDate(data.insight.generatedAt)
+          console.log('Found existing insights for user:', userId)
+        } else {
+          setUserHasInsights(false)
+          setLastInsightDate(null)
+        }
+      } else {
+        setUserHasInsights(false)
+        setLastInsightDate(null)
+      }
+    } catch (error) {
+      console.error('Failed to check user insights:', error)
+      setUserHasInsights(false)
+      setLastInsightDate(null)
+    } finally {
+      setCheckingInsights(false)
+    }
+  }
+
+  const handleUserIdChange = (newUserId: string) => {
+    setUserId(newUserId)
+    // Clear previous state
+    setUploadStatus('')
+    setSelectedFile(null)
+    setInsights(null)
+    setUserHasInsights(false)
+    setLastInsightDate(null)
+  }
+
+  // Use useEffect to handle the debounced insights check
+  useEffect(() => {
+    if (!userId.trim()) {
+      setUserHasInsights(false)
+      return
+    }
+
+    const timeoutId = setTimeout(() => {
+      checkUserInsights(userId)
+    }, 500)
+
+    return () => clearTimeout(timeoutId)
+  }, [userId])
+
+  const generateInsightsForUser = async (userId: string) => {
+    try {
+      const response = await fetch(`https://fwp452jpah.execute-api.us-east-1.amazonaws.com/prod/users/${userId}/insights/generate`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          forceRegenerate: true
+        })
+      })
+
+      if (response.ok) {
+        setUploadStatus('✅ Insights generated! Refreshing your recommendations...')
+        
+        // Wait a moment for insights to be processed, then refresh the component
+        setTimeout(() => {
+          setInsightsRefreshKey(prev => prev + 1)
+          setUserHasInsights(true)
+          setUploadStatus('✅ New insights generated! Check your personalized recommendations below.')
+        }, 5000) // Wait 5 seconds for processing
+      }
+    } catch (error) {
+      console.error('Failed to generate insights:', error)
+      // Don't show error to user as upload was successful
     }
   }
 
@@ -163,7 +293,7 @@ export default function HomePage() {
                 })}
               </div>
               <div className="text-xs text-blue-600">
-                ⏰ Next run in ~{4 - (new Date().getHours() % 4)}h (every 4 hours: 00:00, 04:00, 08:00, 12:00, 16:00, 20:00)
+                ⏰ Next run: Daily at 18:45 UK time (20:45 Sofia time)
               </div>
             </div>
           )}
@@ -232,7 +362,7 @@ export default function HomePage() {
                     id="userId"
                     type="text"
                     value={userId}
-                    onChange={(e) => setUserId(e.target.value)}
+                    onChange={(e) => handleUserIdChange(e.target.value)}
                     placeholder="f0a75560-4b32-4306-90ff-bf3a7466667c"
                   />
                 </div>
@@ -243,6 +373,47 @@ export default function HomePage() {
                     f0a75560-4b32-4306-90ff-bf3a7466667c
                   </p>
                 </div>
+
+                {checkingInsights && (
+                  <div className="p-3 bg-gray-50 border border-gray-200 rounded-md">
+                    <div className="flex items-center gap-2">
+                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600"></div>
+                      <p className="text-sm text-gray-600">Checking for existing insights...</p>
+                    </div>
+                  </div>
+                )}
+
+                {userId && !checkingInsights && userHasInsights && (
+                  <div className="p-3 bg-green-50 border border-green-200 rounded-md">
+                    <p className="text-sm text-green-700">
+                      ✅ <strong>Insights found!</strong> Your personalized recommendations are displayed below.
+                      {lastInsightDate && (
+                        <>
+                          <br />
+                          <span className="text-xs text-green-600">
+                            Last updated: {new Date(lastInsightDate).toLocaleString()}
+                          </span>
+                        </>
+                      )}
+                    </p>
+                  </div>
+                )}
+
+                {userId && !checkingInsights && !userHasInsights && (
+                  <div className="p-3 bg-yellow-50 border border-yellow-200 rounded-md space-y-3">
+                    <p className="text-sm text-yellow-700">
+                      💡 <strong>No insights yet.</strong> Upload a CSV file below or generate insights from existing data.
+                    </p>
+                    <Button 
+                      onClick={() => generateInsightsForUser(userId)}
+                      variant="outline" 
+                      size="sm"
+                      className="w-full"
+                    >
+                      🔮 Generate Insights from Existing Data
+                    </Button>
+                  </div>
+                )}
               </CardContent>
             </Card>
           </div>
@@ -252,8 +423,15 @@ export default function HomePage() {
         {userId && (
           <section className="space-y-6">
             <div className="text-center">
-              <h2 className="text-2xl font-semibold mb-2">Step 2: Upload Transactions</h2>
-              <p className="text-gray-600">Upload your CSV file to analyze spending patterns</p>
+              <h2 className="text-2xl font-semibold mb-2">
+                {userHasInsights ? 'Upload More Transactions' : 'Step 2: Upload Transactions'}
+              </h2>
+              <p className="text-gray-600">
+                {userHasInsights 
+                  ? 'Add new transactions to update your insights' 
+                  : 'Upload your CSV file to analyze spending patterns'
+                }
+              </p>
             </div>
 
             <div className="max-w-md mx-auto">
@@ -301,85 +479,14 @@ export default function HomePage() {
           </section>
         )}
 
-        {/* Insights Display */}
-        {insights && (
+        {/* Daily Insights Display */}
+        {userId && (userHasInsights || insights) && (
           <section className="space-y-6">
             <div className="text-center">
-              <h2 className="text-2xl font-semibold mb-2">Step 3: Your Insights</h2>
+              <h2 className="text-2xl font-semibold mb-2">Your Daily Insights</h2>
               <p className="text-gray-600">AI-powered analysis of your spending patterns</p>
             </div>
-
-            <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-4 max-w-4xl mx-auto">
-              <Card>
-                <CardHeader className="pb-2">
-                  <CardTitle className="text-lg">Transactions</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="text-2xl font-bold text-rose-600">{insights.totalTransactions}</div>
-                  <p className="text-sm text-gray-600">Total processed</p>
-                </CardContent>
-              </Card>
-
-              <Card>
-                <CardHeader className="pb-2">
-                  <CardTitle className="text-lg">Categories</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="text-2xl font-bold text-blue-600">{insights.categoriesFound}</div>
-                  <p className="text-sm text-gray-600">Spending categories</p>
-                </CardContent>
-              </Card>
-
-              <Card>
-                <CardHeader className="pb-2">
-                  <CardTitle className="text-lg">Fees Detected</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="text-2xl font-bold text-orange-600">{insights.feesDetected}</div>
-                  <p className="text-sm text-gray-600">Hidden charges</p>
-                </CardContent>
-              </Card>
-
-              <Card>
-                <CardHeader className="pb-2">
-                  <CardTitle className="text-lg">Opportunities</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="text-2xl font-bold text-green-600">{insights.savingsOpportunities}</div>
-                  <p className="text-sm text-gray-600">Money-saving tips</p>
-                </CardContent>
-              </Card>
-            </div>
-
-            <div className="max-w-2xl mx-auto">
-              <Card>
-                <CardHeader>
-                  <CardTitle>💡 AI Recommendations</CardTitle>
-                  <CardDescription>Personalized insights based on your spending patterns</CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <div className="p-4 bg-green-50 border border-green-200 rounded-lg">
-                    <h4 className="font-semibold text-green-800 mb-2">🎯 Top Savings Opportunity</h4>
-                    <p className="text-green-700 text-sm">
-                      You could save $45/month by switching to a different subscription plan for your streaming services.
-                    </p>
-                    <Button variant="outline" size="sm" className="mt-2">
-                      Why this recommendation?
-                    </Button>
-                  </div>
-
-                  <div className="p-4 bg-orange-50 border border-orange-200 rounded-lg">
-                    <h4 className="font-semibold text-orange-800 mb-2">⚠️ Fee Alert</h4>
-                    <p className="text-orange-700 text-sm">
-                      Detected $12 in ATM fees this month. Consider using in-network ATMs to avoid charges.
-                    </p>
-                    <Button variant="outline" size="sm" className="mt-2">
-                      Show details
-                    </Button>
-                  </div>
-                </CardContent>
-              </Card>
-            </div>
+            <DailyInsights key={`${userId}-${insightsRefreshKey}`} userId={userId} />
           </section>
         )}
 

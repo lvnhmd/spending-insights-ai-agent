@@ -8,10 +8,20 @@ import * as apigateway from 'aws-cdk-lib/aws-apigateway';
 import * as bedrock from 'aws-cdk-lib/aws-bedrock';
 import * as scheduler from 'aws-cdk-lib/aws-scheduler';
 import * as cloudwatch from 'aws-cdk-lib/aws-cloudwatch';
+import * as cloudfront from 'aws-cdk-lib/aws-cloudfront';
+import * as origins from 'aws-cdk-lib/aws-cloudfront-origins';
+import * as route53 from 'aws-cdk-lib/aws-route53';
+import * as targets from 'aws-cdk-lib/aws-route53-targets';
+import * as acm from 'aws-cdk-lib/aws-certificatemanager';
 import * as path from 'path';
 
+interface SpendingInsightsStackProps extends cdk.StackProps {
+  domainName?: string; // e.g., 'spending-insights.yourdomain.com'
+  hostedZoneId?: string; // Your Route 53 hosted zone ID
+}
+
 export class SpendingInsightsStack extends cdk.Stack {
-  constructor(scope: Construct, id: string, props?: cdk.StackProps) {
+  constructor(scope: Construct, id: string, props?: SpendingInsightsStackProps) {
     super(scope, id, props);
 
     // S3 Bucket for CSV uploads and processed data
@@ -22,6 +32,66 @@ export class SpendingInsightsStack extends cdk.Stack {
       versioned: false,
       encryption: s3.BucketEncryption.S3_MANAGED,
     });
+
+    // S3 Bucket for hosting the Next.js frontend
+    const websiteBucket = new s3.Bucket(this, 'SpendingInsightsWebsite', {
+      bucketName: `spending-insights-website-${this.account}-${this.region}`,
+      removalPolicy: cdk.RemovalPolicy.DESTROY,
+      autoDeleteObjects: true,
+      websiteIndexDocument: 'index.html',
+      websiteErrorDocument: 'error.html',
+      publicReadAccess: true,
+      blockPublicAccess: s3.BlockPublicAccess.BLOCK_ACLS,
+    });
+
+    // SSL Certificate and Domain Configuration
+    let certificate: acm.ICertificate | undefined;
+    let hostedZone: route53.IHostedZone | undefined;
+    
+    if (props?.domainName && props?.hostedZoneId) {
+      // Import existing hosted zone
+      hostedZone = route53.HostedZone.fromHostedZoneAttributes(this, 'HostedZone', {
+        hostedZoneId: props.hostedZoneId,
+        zoneName: props.domainName.split('.').slice(-2).join('.'), // Extract root domain
+      });
+
+      // Create SSL certificate
+      certificate = new acm.Certificate(this, 'SpendingInsightsCertificate', {
+        domainName: props.domainName,
+        validation: acm.CertificateValidation.fromDns(hostedZone),
+      });
+    }
+
+    // CloudFront Distribution for global CDN
+    const distribution = new cloudfront.Distribution(this, 'SpendingInsightsDistribution', {
+      defaultBehavior: {
+        origin: new origins.S3Origin(websiteBucket),
+        viewerProtocolPolicy: cloudfront.ViewerProtocolPolicy.REDIRECT_TO_HTTPS,
+        cachePolicy: cloudfront.CachePolicy.CACHING_OPTIMIZED,
+      },
+      defaultRootObject: 'index.html',
+      errorResponses: [
+        {
+          httpStatus: 404,
+          responseHttpStatus: 200,
+          responsePagePath: '/index.html', // SPA routing support
+        },
+      ],
+      // Add custom domain if provided
+      ...(props?.domainName && certificate ? {
+        domainNames: [props.domainName],
+        certificate: certificate,
+      } : {}),
+    });
+
+    // Create DNS record if domain is configured
+    if (props?.domainName && hostedZone) {
+      new route53.ARecord(this, 'SpendingInsightsAliasRecord', {
+        zone: hostedZone,
+        recordName: props.domainName,
+        target: route53.RecordTarget.fromAlias(new targets.CloudFrontTarget(distribution)),
+      });
+    }
 
     // DynamoDB Tables
 
@@ -115,6 +185,17 @@ export class SpendingInsightsStack extends cdk.Stack {
         `arn:aws:bedrock:${this.region}::foundation-model/amazon.nova-lite-v1:0`,
         `arn:aws:bedrock:${this.region}::foundation-model/amazon.nova-pro-v1:0`,
         `arn:aws:bedrock:${this.region}:${this.account}:guardrail/*`,
+      ],
+    }));
+
+    // Grant Lambda invoke permissions (for API handler to trigger insights generator)
+    lambdaRole.addToPolicy(new iam.PolicyStatement({
+      effect: iam.Effect.ALLOW,
+      actions: [
+        'lambda:InvokeFunction',
+      ],
+      resources: [
+        `arn:aws:lambda:${this.region}:${this.account}:function:spending-insights-*`,
       ],
     }));
 
@@ -268,11 +349,11 @@ export class SpendingInsightsStack extends cdk.Stack {
     // Grant scheduler permission to invoke the weekly insights Lambda
     weeklyInsightsLambda.grantInvoke(schedulerRole);
 
-    // Create the insights schedule (starting at 14:28 Sofia time, then every 4 hours)
+    // Create the insights schedule (daily at 20:45 Sofia time / 18:45 UK time)
     const insightsSchedule = new scheduler.CfnSchedule(this, 'InsightsSchedule', {
-      name: 'spending-insights-4hour-generation',
-      description: 'Autonomous insights generation starting at 14:28 Sofia time, then every 4 hours',
-      scheduleExpression: 'cron(28 2,6,10,14,18,22 * * ? *)', // 02:28, 06:28, 10:28, 14:28, 18:28, 22:28 Sofia time
+      name: 'spending-insights-daily-generation',
+      description: 'Autonomous daily insights generation at 20:45 Sofia time (18:45 UK time)',
+      scheduleExpression: 'cron(45 20 * * ? *)', // 20:45 Sofia time daily
       scheduleExpressionTimezone: 'Europe/Sofia',
       flexibleTimeWindow: {
         mode: 'OFF'
@@ -282,7 +363,7 @@ export class SpendingInsightsStack extends cdk.Stack {
         roleArn: schedulerRole.roleArn,
         input: JSON.stringify({
           source: 'autonomous-scheduler',
-          runType: '4hour-insights',
+          runType: 'daily-insights',
           timestamp: new Date().toISOString()
         })
       },
@@ -530,8 +611,8 @@ Response Format:
     });
 
     new cdk.CfnOutput(this, 'InsightsScheduleName', {
-      value: insightsSchedule.name || 'spending-insights-4hour-generation',
-      description: 'EventBridge Scheduler for 4-hour insights generation',
+      value: insightsSchedule.name || 'spending-insights-daily-generation',
+      description: 'EventBridge Scheduler for daily insights generation',
     });
 
     new cdk.CfnOutput(this, 'CloudWatchDashboardUrl', {
@@ -553,5 +634,27 @@ Response Format:
       value: guardrailVersion.attrVersion,
       description: 'Bedrock Guardrail Version',
     });
+
+    new cdk.CfnOutput(this, 'WebsiteBucketName', {
+      value: websiteBucket.bucketName,
+      description: 'S3 bucket for website hosting',
+    });
+
+    new cdk.CfnOutput(this, 'WebsiteUrl', {
+      value: `http://${websiteBucket.bucketWebsiteUrl}`,
+      description: 'Website URL (S3)',
+    });
+
+    new cdk.CfnOutput(this, 'CloudFrontUrl', {
+      value: `https://${distribution.distributionDomainName}`,
+      description: 'Website URL (CloudFront CDN)',
+    });
+
+    if (props?.domainName) {
+      new cdk.CfnOutput(this, 'CustomDomainUrl', {
+        value: `https://${props.domainName}`,
+        description: 'Website URL (Custom Domain)',
+      });
+    }
   }
 }

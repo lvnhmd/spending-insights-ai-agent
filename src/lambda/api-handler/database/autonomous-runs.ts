@@ -5,7 +5,7 @@
 
 import { DynamoDBClient } from '@aws-sdk/client-dynamodb';
 import { DynamoDBDocumentClient, PutCommand, QueryCommand, GetCommand } from '@aws-sdk/lib-dynamodb';
-import { getDynamoDBClient } from './dynamodb-client';
+import { docClient } from './dynamodb-client';
 
 const AUTONOMOUS_RUNS_TABLE = process.env.AUTONOMOUS_RUNS_TABLE || 'spending-insights-autonomous-runs';
 
@@ -27,7 +27,7 @@ export interface AutonomousRun {
  * Get the latest autonomous run for a specific type
  */
 export async function getLatestAutonomousRun(runType: string): Promise<AutonomousRun | null> {
-  const client = getDynamoDBClient();
+  const client = docClient;
   
   const command = new QueryCommand({
     TableName: AUTONOMOUS_RUNS_TABLE,
@@ -55,7 +55,7 @@ export async function getRecentAutonomousRuns(
   runType?: string,
   limit: number = 10
 ): Promise<AutonomousRun[]> {
-  const client = getDynamoDBClient();
+  const client = docClient;
   
   if (runType) {
     const command = new QueryCommand({
@@ -88,7 +88,7 @@ export async function getAutonomousRunStats(runType: string, days: number = 7): 
   totalUsersProcessed: number;
   totalInsightsGenerated: number;
 }> {
-  const client = getDynamoDBClient();
+  const client = docClient;
   
   // Calculate date threshold
   const thresholdDate = new Date();

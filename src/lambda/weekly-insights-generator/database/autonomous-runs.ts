@@ -4,8 +4,8 @@
  */
 
 import { DynamoDBClient } from '@aws-sdk/client-dynamodb';
-import { DynamoDBDocumentClient, PutCommand, QueryCommand, GetCommand } from '@aws-sdk/lib-dynamodb';
-import { getDynamoDBClient } from './dynamodb-client';
+import { DynamoDBDocumentClient, PutCommand, UpdateCommand, QueryCommand, GetCommand } from '@aws-sdk/lib-dynamodb';
+import { docClient } from './dynamodb-client';
 
 const AUTONOMOUS_RUNS_TABLE = process.env.AUTONOMOUS_RUNS_TABLE || 'spending-insights-autonomous-runs';
 
@@ -30,7 +30,7 @@ export async function startAutonomousRun(
   runType: string,
   metadata?: Record<string, any>
 ): Promise<AutonomousRun> {
-  const client = getDynamoDBClient();
+  const client = docClient;
   const timestamp = new Date().toISOString();
   
   const autonomousRun: AutonomousRun = {
@@ -66,16 +66,30 @@ export async function completeAutonomousRun(
     duration?: number;
   }
 ): Promise<void> {
-  const client = getDynamoDBClient();
+  const client = docClient;
   
-  const command = new PutCommand({
+  const command = new UpdateCommand({
     TableName: AUTONOMOUS_RUNS_TABLE,
-    Item: {
+    Key: {
       runType,
-      runTimestamp,
-      status: 'completed',
-      ...results,
-      updatedAt: new Date()
+      runTimestamp
+    },
+    UpdateExpression: 'SET #status = :status, #usersProcessed = :usersProcessed, #insightsGenerated = :insightsGenerated, #recommendationsCreated = :recommendationsCreated, #duration = :duration, #updatedAt = :updatedAt',
+    ExpressionAttributeNames: {
+      '#status': 'status',
+      '#usersProcessed': 'usersProcessed',
+      '#insightsGenerated': 'insightsGenerated',
+      '#recommendationsCreated': 'recommendationsCreated',
+      '#duration': 'duration',
+      '#updatedAt': 'updatedAt'
+    },
+    ExpressionAttributeValues: {
+      ':status': 'completed',
+      ':usersProcessed': results.usersProcessed || 0,
+      ':insightsGenerated': results.insightsGenerated || 0,
+      ':recommendationsCreated': results.recommendationsCreated || 0,
+      ':duration': results.duration || 0,
+      ':updatedAt': new Date()
     }
   });
 
@@ -92,17 +106,26 @@ export async function failAutonomousRun(
   errorMessage: string,
   duration?: number
 ): Promise<void> {
-  const client = getDynamoDBClient();
+  const client = docClient;
   
-  const command = new PutCommand({
+  const command = new UpdateCommand({
     TableName: AUTONOMOUS_RUNS_TABLE,
-    Item: {
+    Key: {
       runType,
-      runTimestamp,
-      status: 'failed',
-      errorMessage,
-      duration,
-      updatedAt: new Date()
+      runTimestamp
+    },
+    UpdateExpression: 'SET #status = :status, #errorMessage = :errorMessage, #duration = :duration, #updatedAt = :updatedAt',
+    ExpressionAttributeNames: {
+      '#status': 'status',
+      '#errorMessage': 'errorMessage',
+      '#duration': 'duration',
+      '#updatedAt': 'updatedAt'
+    },
+    ExpressionAttributeValues: {
+      ':status': 'failed',
+      ':errorMessage': errorMessage,
+      ':duration': duration || 0,
+      ':updatedAt': new Date()
     }
   });
 
@@ -114,7 +137,7 @@ export async function failAutonomousRun(
  * Get the latest autonomous run for a specific type
  */
 export async function getLatestAutonomousRun(runType: string): Promise<AutonomousRun | null> {
-  const client = getDynamoDBClient();
+  const client = docClient;
   
   const command = new QueryCommand({
     TableName: AUTONOMOUS_RUNS_TABLE,

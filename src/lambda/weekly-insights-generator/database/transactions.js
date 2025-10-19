@@ -7,6 +7,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.createTransaction = createTransaction;
 exports.getTransaction = getTransaction;
 exports.getTransactionsByDateRange = getTransactionsByDateRange;
+exports.getAllTransactionsForUser = getAllTransactionsForUser;
 exports.getTransactionsByWeek = getTransactionsByWeek;
 exports.getTransactionsByWeekAndCategory = getTransactionsByWeekAndCategory;
 exports.updateTransaction = updateTransaction;
@@ -78,6 +79,22 @@ async function getTransactionsByDateRange(userId, startDate, endDate) {
             },
         }));
     }, 'getTransactionsByDateRange');
+    return (result.Items || []).map(item => recordToTransaction(item));
+}
+// Get all transactions for a user (most recent first)
+async function getAllTransactionsForUser(userId, limit) {
+    const userKey = (0, dynamodb_client_1.generateUserKey)(userId);
+    const result = await (0, dynamodb_client_1.withErrorHandling)(async () => {
+        return await dynamodb_client_1.docClient.send(new lib_dynamodb_1.QueryCommand({
+            TableName: dynamodb_client_1.TABLE_NAMES.TRANSACTIONS,
+            KeyConditionExpression: 'userId = :userId',
+            ExpressionAttributeValues: {
+                ':userId': userKey,
+            },
+            ScanIndexForward: false, // Sort descending by transactionKey (which includes date)
+            ...(limit && { Limit: limit }),
+        }));
+    }, 'getAllTransactionsForUser');
     return (result.Items || []).map(item => recordToTransaction(item));
 }
 // Get transactions for a specific week using GSI

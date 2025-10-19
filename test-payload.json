@@ -1,6 +1,5 @@
 {
-  "userId": "6d336458-d2e3-4c69-b42c-60d3618e3752",
-  "csvContent": "date,description,amount,account,category
-01/15/2024,Test Transaction,-10.00,Checking,Food",
-  "operation": "process_csv"
+  "source": "autonomous-scheduler",
+  "runType": "daily-insights", 
+  "timestamp": "2025-10-17T18:55:00.000Z"
 }

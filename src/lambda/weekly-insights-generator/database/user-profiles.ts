@@ -3,7 +3,7 @@
  * Requirements: 7.6, 8.1, 1.5
  */
 
-import { PutCommand, GetCommand, UpdateCommand, DeleteCommand } from '@aws-sdk/lib-dynamodb';
+import { PutCommand, GetCommand, UpdateCommand, DeleteCommand, ScanCommand } from '@aws-sdk/lib-dynamodb';
 import { docClient, TABLE_NAMES, withErrorHandling, generateUserKey } from './dynamodb-client';
 import { UserProfile } from '../types';
 
@@ -199,6 +199,45 @@ export async function updateNotificationPreferences(
 // Mark onboarding as completed
 export async function completeOnboarding(userId: string): Promise<void> {
   await updateUserProfile(userId, { onboardingCompleted: true });
+}
+
+// Get all user profiles
+export async function getAllUserProfiles(): Promise<UserProfile[]> {
+  const result = await withErrorHandling(async () => {
+    return await docClient.send(new ScanCommand({
+      TableName: TABLE_NAMES.USER_PROFILES,
+      FilterExpression: 'profileType = :profileType',
+      ExpressionAttributeValues: {
+        ':profileType': PROFILE_TYPE,
+      },
+    }));
+  }, 'getAllUserProfiles');
+
+  if (!result.Items || result.Items.length === 0) {
+    return [];
+  }
+
+  return result.Items.map(item => recordToUserProfile(item as UserProfileRecord));
+}
+
+// Get all user IDs (lightweight version)
+export async function getAllUserIds(): Promise<string[]> {
+  const result = await withErrorHandling(async () => {
+    return await docClient.send(new ScanCommand({
+      TableName: TABLE_NAMES.USER_PROFILES,
+      FilterExpression: 'profileType = :profileType',
+      ExpressionAttributeValues: {
+        ':profileType': PROFILE_TYPE,
+      },
+      ProjectionExpression: 'userId',
+    }));
+  }, 'getAllUserIds');
+
+  if (!result.Items || result.Items.length === 0) {
+    return [];
+  }
+
+  return result.Items.map(item => (item as UserProfileRecord).userId.replace('USER#', ''));
 }
 
 // Helper function to convert DynamoDB record to UserProfile

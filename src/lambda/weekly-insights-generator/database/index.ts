@@ -8,7 +8,7 @@ export * from './dynamodb-client';
 
 // Table operations
 export * from './transactions';
-export * from './weekly-insights';
+export * from './daily-insights';
 export * from './agent-memory';
 export * from './user-profiles';
 

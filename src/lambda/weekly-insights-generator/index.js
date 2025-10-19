@@ -1,97 +1,184 @@
 "use strict";
 /**
- * Weekly Insights Generator Lambda Function
+ * Daily Insights Generator Lambda Function
  * Requirements: 2.1, 2.2, 2.3, 2.4, 7.3, 8.6
  *
  * Handles:
- * - Spending pattern analysis and trend detection
+ * - Spending pattern analysis and trend detection based on recent transactions
  * - Recommendation generation with impact vs effort prioritization
  * - Post-hoc explanation generation for transparency
  * - Savings calculations and actionable step guidance
+ * - Autonomous operation with EventBridge Scheduler
  */
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.handler = void 0;
 const transactions_1 = require("./database/transactions");
-const weekly_insights_1 = require("./database/weekly-insights");
+const daily_insights_1 = require("./database/daily-insights");
+const autonomous_runs_1 = require("./database/autonomous-runs");
+const user_profiles_1 = require("./database/user-profiles");
 const crypto_1 = require("crypto");
 const handler = async (event, context) => {
-    console.log('Weekly Insights Generator Lambda - Event:', JSON.stringify(event, null, 2));
+    console.log('Daily Insights Generator Lambda - Event:', JSON.stringify(event, null, 2));
+    const startTime = Date.now();
     try {
-        const { userId, weekOf, forceRegenerate = false } = event;
+        const { userId, dateRange, forceRegenerate = false, source, runType, timestamp } = event;
+        // Handle autonomous scheduler invocation (process all users)
+        if (source === 'autonomous-scheduler') {
+            return await handleAutonomousRun(event, startTime);
+        }
+        // Handle single user invocation
         if (!userId) {
-            throw new Error('userId is required');
+            throw new Error('userId is required for single user processing');
         }
-        // Determine the week to analyze
-        const weekDate = weekOf ? new Date(weekOf) : new Date();
-        const weekKey = getISOWeekKey(weekDate);
-        // Check if insights already exist for this week
-        if (!forceRegenerate) {
-            const existingInsights = await (0, weekly_insights_1.getWeeklyInsight)(userId, weekDate);
-            if (existingInsights) {
-                console.log('Returning existing insights for week:', weekKey);
-                return {
-                    success: true,
-                    insights: existingInsights,
-                    generated: false,
-                    message: 'Existing insights returned'
-                };
-            }
-        }
-        // Get transactions for the week
-        const transactions = await (0, transactions_1.getTransactionsByWeek)(userId, weekDate);
-        if (transactions.length === 0) {
-            console.log('No transactions found for week:', weekKey);
-            return {
-                success: false,
-                message: 'No transactions found for the specified week',
-                weekKey
-            };
-        }
-        console.log(`Analyzing ${transactions.length} transactions for week ${weekKey}`);
-        // Analyze spending patterns
-        const spendingPatterns = await analyzeSpendingPatterns(transactions, userId);
-        // Calculate category spending
-        const categorySpending = calculateCategorySpending(transactions);
-        // Identify savings opportunities
-        const savingsOpportunities = await identifySavingsOpportunities(transactions, spendingPatterns);
-        // Generate recommendations
-        const recommendations = await generateRecommendations(savingsOpportunities, categorySpending);
-        // Calculate total potential savings
-        const potentialSavings = recommendations.reduce((sum, rec) => sum + rec.potentialSavings, 0);
-        // Calculate total spent
-        const totalSpent = transactions
-            .filter(t => t.transactionType === 'debit')
-            .reduce((sum, t) => sum + t.amount, 0);
-        // Create weekly insight
-        const weeklyInsight = {
-            id: (0, crypto_1.randomUUID)(),
-            userId,
-            weekOf: weekDate,
-            totalSpent,
-            topCategories: categorySpending.slice(0, 5), // Top 5 categories
-            recommendations,
-            potentialSavings,
-            implementedActions: [], // Will be updated when user implements recommendations
-            generatedAt: new Date(),
-            weekNumber: getISOWeekNumber(weekDate),
-            year: weekDate.getFullYear()
-        };
-        // Store insights in database
-        await (0, weekly_insights_1.createWeeklyInsight)(weeklyInsight);
-        console.log(`Generated insights for week ${weekKey}: ${recommendations.length} recommendations, $${potentialSavings.toFixed(2)} potential savings`);
-        return {
-            success: true,
-            insights: weeklyInsight,
-            generated: true,
-            message: `Generated ${recommendations.length} recommendations with $${potentialSavings.toFixed(2)} potential savings`
-        };
+        return await processUserInsights(userId, dateRange, forceRegenerate);
     }
     catch (error) {
         console.error('Weekly Insights Generator Error:', error);
+        // If this was an autonomous run, mark it as failed
+        if (event.source === 'autonomous-scheduler' && event.timestamp) {
+            await (0, autonomous_runs_1.failAutonomousRun)('daily-insights', event.timestamp, error instanceof Error ? error.message : 'Unknown error', Date.now() - startTime);
+        }
         throw error;
     }
 };
 exports.handler = handler;
+/**
+ * Handle autonomous run for all users
+ */
+async function handleAutonomousRun(event, startTime) {
+    const runTimestamp = event.timestamp || new Date().toISOString();
+    // Start tracking the autonomous run
+    const autonomousRun = await (0, autonomous_runs_1.startAutonomousRun)('daily-insights', {
+        source: event.source,
+        scheduledTime: runTimestamp
+    });
+    try {
+        // Get all users from the user profiles table
+        console.log('Fetching all user IDs from user profiles table...');
+        const allUserIds = await (0, user_profiles_1.getAllUserIds)();
+        console.log(`Found ${allUserIds.length} users in the database`);
+        let usersProcessed = 0;
+        let totalInsights = 0;
+        let totalRecommendations = 0;
+        for (const userId of allUserIds) {
+            try {
+                console.log(`Processing insights for user: ${userId}`);
+                const result = await processUserInsights(userId, event.dateRange, false);
+                if (result.success && result.generated) {
+                    usersProcessed++;
+                    totalInsights++;
+                    totalRecommendations += result.insights?.recommendations?.length || 0;
+                    console.log(`Successfully generated insights for user ${userId}: ${result.insights?.recommendations?.length || 0} recommendations`);
+                }
+                else if (result.success && !result.generated) {
+                    console.log(`User ${userId} already has insights for this period`);
+                }
+                else {
+                    console.log(`No transactions found for user ${userId} in the current period`);
+                }
+            }
+            catch (userError) {
+                console.error(`Failed to process insights for user ${userId}:`, userError);
+                // Continue processing other users
+            }
+        }
+        // Complete the autonomous run
+        await (0, autonomous_runs_1.completeAutonomousRun)('daily-insights', runTimestamp, {
+            usersProcessed,
+            insightsGenerated: totalInsights,
+            recommendationsCreated: totalRecommendations,
+            duration: Date.now() - startTime
+        });
+        console.log(`Autonomous run completed: ${usersProcessed} users processed, ${totalInsights} insights generated`);
+        return {
+            success: true,
+            autonomousRun: true,
+            usersProcessed,
+            insightsGenerated: totalInsights,
+            recommendationsCreated: totalRecommendations,
+            duration: Date.now() - startTime,
+            message: `Autonomous daily insights generation completed for ${usersProcessed} users`
+        };
+    }
+    catch (error) {
+        await (0, autonomous_runs_1.failAutonomousRun)('daily-insights', runTimestamp, error instanceof Error ? error.message : 'Unknown error', Date.now() - startTime);
+        throw error;
+    }
+}
+/**
+ * Process insights for a single user
+ */
+async function processUserInsights(userId, dateRange, forceRegenerate = false) {
+    // Get the most recent transactions for the user (up to 100 transactions)
+    const transactions = await (0, transactions_1.getAllTransactionsForUser)(userId, 100);
+    if (transactions.length === 0) {
+        console.log('No transactions found for user:', userId);
+        return {
+            success: false,
+            message: 'No transactions found for user',
+            userId
+        };
+    }
+    console.log(`Analyzing ${transactions.length} most recent transactions for user ${userId}`);
+    // Use current date as analysis date
+    const analysisDate = new Date();
+    // Determine the date range of the transactions we're analyzing
+    const transactionDates = transactions.map(t => t.date).sort((a, b) => a.getTime() - b.getTime());
+    const analysisStart = transactionDates[0];
+    const analysisEnd = transactionDates[transactionDates.length - 1];
+    // Check if insights already exist for today (unless force regenerate)
+    if (!forceRegenerate) {
+        const existingInsights = await (0, daily_insights_1.getDailyInsight)(userId, analysisDate);
+        if (existingInsights) {
+            console.log('Returning existing insights for today for user:', userId);
+            return {
+                success: true,
+                insights: existingInsights,
+                generated: false,
+                message: 'Existing insights returned'
+            };
+        }
+    }
+    // Analyze spending patterns
+    const spendingPatterns = await analyzeSpendingPatterns(transactions, userId);
+    // Calculate category spending
+    const categorySpending = calculateCategorySpending(transactions);
+    // Identify savings opportunities
+    const savingsOpportunities = await identifySavingsOpportunities(transactions, spendingPatterns);
+    // Generate recommendations
+    const recommendations = await generateRecommendations(savingsOpportunities, categorySpending);
+    // Calculate total potential savings
+    const potentialSavings = recommendations.reduce((sum, rec) => sum + rec.potentialSavings, 0);
+    // Calculate total spent
+    const totalSpent = transactions
+        .filter(t => t.transactionType === 'debit')
+        .reduce((sum, t) => sum + t.amount, 0);
+    // Create daily insight
+    const dailyInsight = {
+        id: (0, crypto_1.randomUUID)(),
+        userId,
+        analysisDate: analysisDate,
+        analysisStartDate: analysisStart,
+        analysisEndDate: analysisEnd,
+        totalSpent,
+        topCategories: categorySpending.slice(0, 5), // Top 5 categories
+        recommendations,
+        potentialSavings,
+        implementedActions: [], // Will be updated when user implements recommendations
+        generatedAt: new Date(),
+        transactionCount: transactions.length
+    };
+    // Store insights in database
+    await (0, daily_insights_1.createDailyInsight)(dailyInsight);
+    const transactionDateRange = `${analysisStart.toISOString().split('T')[0]} to ${analysisEnd.toISOString().split('T')[0]}`;
+    console.log(`Generated insights for user ${userId} based on ${transactions.length} transactions from ${transactionDateRange}: ${recommendations.length} recommendations, ${potentialSavings.toFixed(2)} potential savings`);
+    return {
+        success: true,
+        insights: dailyInsight,
+        generated: true,
+        message: `Generated ${recommendations.length} recommendations with ${potentialSavings.toFixed(2)} potential savings`
+    };
+}
 /**
  * Analyze spending patterns and trends
  */
@@ -177,7 +264,7 @@ async function identifySavingsOpportunities(transactions, patterns) {
             difficulty: 'easy',
             category: sub.category,
             transactions: [sub],
-            reasoning: `This recurring charge of $${sub.amount} could save $${(sub.amount * 12).toFixed(2)} annually if cancelled`
+            reasoning: `This recurring charge of ${sub.amount} could save ${(sub.amount * 12).toFixed(2)} annually if cancelled`
         });
     }
     // 2. Identify bank fees
@@ -192,7 +279,7 @@ async function identifySavingsOpportunities(transactions, patterns) {
             difficulty: 'medium',
             category: fee.category,
             transactions: [fee],
-            reasoning: `Bank fees like this $${fee.amount} charge can often be avoided by changing account types or banking habits`
+            reasoning: `Bank fees like this ${fee.amount} charge can often be avoided by changing account types or banking habits`
         });
     }
     // 3. Identify category overspending
@@ -206,7 +293,7 @@ async function identifySavingsOpportunities(transactions, patterns) {
             difficulty: 'medium',
             category: pattern.category,
             transactions: categoryTransactions,
-            reasoning: `You spent $${pattern.weeklyAverage.toFixed(2)} on ${pattern.category} this week. A 20% reduction could save $${(pattern.weeklyAverage * 0.2 * 52).toFixed(2)} annually`
+            reasoning: `You spent ${pattern.weeklyAverage.toFixed(2)} on ${pattern.category} this week. A 20% reduction could save ${(pattern.weeklyAverage * 0.2 * 52).toFixed(2)} annually`
         });
     }
     // 4. Identify duplicate or similar charges
@@ -218,7 +305,7 @@ async function identifySavingsOpportunities(transactions, patterns) {
             potentialSavings: duplicates.reduce((sum, t) => sum + t.amount, 0),
             difficulty: 'easy',
             transactions: duplicates,
-            reasoning: `Found ${duplicates.length} potentially duplicate transactions totaling $${duplicates.reduce((sum, t) => sum + t.amount, 0).toFixed(2)}`
+            reasoning: `Found ${duplicates.length} potentially duplicate transactions totaling ${duplicates.reduce((sum, t) => sum + t.amount, 0).toFixed(2)}`
         });
     }
     return opportunities.sort((a, b) => b.potentialSavings - a.potentialSavings);
@@ -256,12 +343,12 @@ async function generateRecommendations(opportunities, categorySpending) {
             id: (0, crypto_1.randomUUID)(),
             type: 'save',
             title: `Track ${topCategory.category} spending more closely`,
-            description: `You spent $${topCategory.totalAmount.toFixed(2)} on ${topCategory.category} this week (${topCategory.percentOfTotal.toFixed(1)}% of total spending). Consider setting a weekly budget for this category.`,
+            description: `You spent ${topCategory.totalAmount.toFixed(2)} on ${topCategory.category} this week (${topCategory.percentOfTotal.toFixed(1)}% of total spending). Consider setting a weekly budget for this category.`,
             potentialSavings: topCategory.totalAmount * 0.15 * 52, // 15% reduction annualized
             difficulty: 'easy',
             priority: 3,
             actionSteps: [
-                `Set a weekly budget of $${(topCategory.totalAmount * 0.85).toFixed(2)} for ${topCategory.category}`,
+                `Set a weekly budget of ${(topCategory.totalAmount * 0.85).toFixed(2)} for ${topCategory.category}`,
                 'Track spending in this category daily',
                 'Look for alternatives or ways to reduce costs',
                 'Review progress weekly'
@@ -390,15 +477,7 @@ function findDuplicateTransactions(transactions) {
     }
     return duplicates;
 }
-function getISOWeekNumber(date) {
-    const d = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
-    const dayNum = d.getUTCDay() || 7;
-    d.setUTCDate(d.getUTCDate() + 4 - dayNum);
-    const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
-    return Math.ceil((((d.getTime() - yearStart.getTime()) / 86400000) + 1) / 7);
-}
-function getISOWeekKey(date) {
-    const year = date.getFullYear();
-    const week = getISOWeekNumber(date);
-    return `${year}-W${week.toString().padStart(2, '0')}`;
+// Helper function to format date range for logging
+function getDateRangeKey(startDate, endDate) {
+    return `${startDate.toISOString().split('T')[0]}_to_${endDate.toISOString().split('T')[0]}`;
 }

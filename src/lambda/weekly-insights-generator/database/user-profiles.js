@@ -13,6 +13,8 @@ exports.getOrCreateUserProfile = getOrCreateUserProfile;
 exports.updateFinancialGoals = updateFinancialGoals;
 exports.updateNotificationPreferences = updateNotificationPreferences;
 exports.completeOnboarding = completeOnboarding;
+exports.getAllUserProfiles = getAllUserProfiles;
+exports.getAllUserIds = getAllUserIds;
 const lib_dynamodb_1 = require("@aws-sdk/lib-dynamodb");
 const dynamodb_client_1 = require("./dynamodb-client");
 const PROFILE_TYPE = 'PROFILE';
@@ -161,6 +163,39 @@ async function updateNotificationPreferences(userId, preferences) {
 // Mark onboarding as completed
 async function completeOnboarding(userId) {
     await updateUserProfile(userId, { onboardingCompleted: true });
+}
+// Get all user profiles
+async function getAllUserProfiles() {
+    const result = await (0, dynamodb_client_1.withErrorHandling)(async () => {
+        return await dynamodb_client_1.docClient.send(new lib_dynamodb_1.ScanCommand({
+            TableName: dynamodb_client_1.TABLE_NAMES.USER_PROFILES,
+            FilterExpression: 'profileType = :profileType',
+            ExpressionAttributeValues: {
+                ':profileType': PROFILE_TYPE,
+            },
+        }));
+    }, 'getAllUserProfiles');
+    if (!result.Items || result.Items.length === 0) {
+        return [];
+    }
+    return result.Items.map(item => recordToUserProfile(item));
+}
+// Get all user IDs (lightweight version)
+async function getAllUserIds() {
+    const result = await (0, dynamodb_client_1.withErrorHandling)(async () => {
+        return await dynamodb_client_1.docClient.send(new lib_dynamodb_1.ScanCommand({
+            TableName: dynamodb_client_1.TABLE_NAMES.USER_PROFILES,
+            FilterExpression: 'profileType = :profileType',
+            ExpressionAttributeValues: {
+                ':profileType': PROFILE_TYPE,
+            },
+            ProjectionExpression: 'userId',
+        }));
+    }, 'getAllUserIds');
+    if (!result.Items || result.Items.length === 0) {
+        return [];
+    }
+    return result.Items.map(item => item.userId.replace('USER#', ''));
 }
 // Helper function to convert DynamoDB record to UserProfile
 function recordToUserProfile(record) {

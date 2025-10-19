@@ -22,6 +22,6 @@ Object.defineProperty(exports, "__esModule", { value: true });
 __exportStar(require("./dynamodb-client"), exports);
 // Table operations
 __exportStar(require("./transactions"), exports);
-__exportStar(require("./weekly-insights"), exports);
+__exportStar(require("./daily-insights"), exports);
 __exportStar(require("./agent-memory"), exports);
 __exportStar(require("./user-profiles"), exports);

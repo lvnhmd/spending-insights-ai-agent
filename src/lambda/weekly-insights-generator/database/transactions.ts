@@ -106,6 +106,25 @@ export async function getTransactionsByDateRange(
     return (result.Items || []).map(item => recordToTransaction(item as TransactionRecord));
 }
 
+// Get all transactions for a user (most recent first)
+export async function getAllTransactionsForUser(userId: string, limit?: number): Promise<Transaction[]> {
+    const userKey = generateUserKey(userId);
+
+    const result = await withErrorHandling(async () => {
+        return await docClient.send(new QueryCommand({
+            TableName: TABLE_NAMES.TRANSACTIONS,
+            KeyConditionExpression: 'userId = :userId',
+            ExpressionAttributeValues: {
+                ':userId': userKey,
+            },
+            ScanIndexForward: false, // Sort descending by transactionKey (which includes date)
+            ...(limit && { Limit: limit }),
+        }));
+    }, 'getAllTransactionsForUser');
+
+    return (result.Items || []).map(item => recordToTransaction(item as TransactionRecord));
+}
+
 // Get transactions for a specific week using GSI
 export async function getTransactionsByWeek(userId: string, date: Date): Promise<Transaction[]> {
     const userWeekKey = generateUserWeekKey(userId, date);

@@ -1,9 +1,9 @@
 /**
- * Weekly Insights Generator Lambda Function
+ * Daily Insights Generator Lambda Function
  * Requirements: 2.1, 2.2, 2.3, 2.4, 7.3, 8.6
  * 
  * Handles:
- * - Spending pattern analysis and trend detection
+ * - Spending pattern analysis and trend detection based on recent transactions
  * - Recommendation generation with impact vs effort prioritization
  * - Post-hoc explanation generation for transparency
  * - Savings calculations and actionable step guidance
@@ -11,15 +11,16 @@
  */
 
 import { Context } from 'aws-lambda';
-import { getTransactionsByWeek } from './database/transactions';
-import { createWeeklyInsight, getWeeklyInsight } from './database/weekly-insights';
+import { getAllTransactionsForUser } from './database/transactions';
+import { createDailyInsight, getDailyInsight } from './database/daily-insights';
 import { startAutonomousRun, completeAutonomousRun, failAutonomousRun } from './database/autonomous-runs';
-import { Transaction, WeeklyInsight, Recommendation, CategorySpending } from './types';
+import { getAllUserIds } from './database/user-profiles';
+import { Transaction, DailyInsight, Recommendation, CategorySpending } from './types';
 import { randomUUID } from 'crypto';
 
-interface WeeklyInsightsEvent {
+interface DailyInsightsEvent {
   userId?: string;
-  weekOf?: string; // ISO date string, defaults to current week
+  dateRange?: { start: string; end: string }; // ISO date strings, defaults to recent transactions
   forceRegenerate?: boolean;
   source?: 'autonomous-scheduler' | 'manual' | 'api';
   runType?: string;
@@ -45,15 +46,15 @@ interface SavingsOpportunity {
 }
 
 export const handler = async (
-  event: WeeklyInsightsEvent,
+  event: DailyInsightsEvent,
   context: Context
 ): Promise<any> => {
-  console.log('Weekly Insights Generator Lambda - Event:', JSON.stringify(event, null, 2));
+  console.log('Daily Insights Generator Lambda - Event:', JSON.stringify(event, null, 2));
 
   const startTime = Date.now();
 
   try {
-    const { userId, weekOf, forceRegenerate = false, source, runType, timestamp } = event;
+    const { userId, dateRange, forceRegenerate = false, source, runType, timestamp } = event;
 
     // Handle autonomous scheduler invocation (process all users)
     if (source === 'autonomous-scheduler') {
@@ -65,7 +66,7 @@ export const handler = async (
       throw new Error('userId is required for single user processing');
     }
 
-    return await processUserInsights(userId, weekOf, forceRegenerate);
+    return await processUserInsights(userId, dateRange, forceRegenerate);
 
   } catch (error) {
     console.error('Weekly Insights Generator Error:', error);
@@ -73,7 +74,7 @@ export const handler = async (
     // If this was an autonomous run, mark it as failed
     if (event.source === 'autonomous-scheduler' && event.timestamp) {
       await failAutonomousRun(
-        'weekly-insights',
+        'daily-insights',
         event.timestamp,
         error instanceof Error ? error.message : 'Unknown error',
         Date.now() - startTime
@@ -87,31 +88,38 @@ export const handler = async (
 /**
  * Handle autonomous run for all users
  */
-async function handleAutonomousRun(event: WeeklyInsightsEvent, startTime: number): Promise<any> {
+async function handleAutonomousRun(event: DailyInsightsEvent, startTime: number): Promise<any> {
   const runTimestamp = event.timestamp || new Date().toISOString();
   
   // Start tracking the autonomous run
-  const autonomousRun = await startAutonomousRun('weekly-insights', {
+  const autonomousRun = await startAutonomousRun('daily-insights', {
     source: event.source,
     scheduledTime: runTimestamp
   });
 
   try {
-    // For demo purposes, we'll process a few mock users
-    // In production, this would query all users from the user profiles table
-    const mockUsers = ['demo-user-1', 'demo-user-2', 'demo-user-3'];
+    // Get all users from the user profiles table
+    console.log('Fetching all user IDs from user profiles table...');
+    const allUserIds = await getAllUserIds();
+    console.log(`Found ${allUserIds.length} users in the database`);
     
     let usersProcessed = 0;
     let totalInsights = 0;
     let totalRecommendations = 0;
 
-    for (const userId of mockUsers) {
+    for (const userId of allUserIds) {
       try {
-        const result = await processUserInsights(userId, event.weekOf, false);
+        console.log(`Processing insights for user: ${userId}`);
+        const result = await processUserInsights(userId, event.dateRange, false);
         if (result.success && result.generated) {
           usersProcessed++;
           totalInsights++;
           totalRecommendations += result.insights?.recommendations?.length || 0;
+          console.log(`Successfully generated insights for user ${userId}: ${result.insights?.recommendations?.length || 0} recommendations`);
+        } else if (result.success && !result.generated) {
+          console.log(`User ${userId} already has insights for this period`);
+        } else {
+          console.log(`No transactions found for user ${userId} in the current period`);
         }
       } catch (userError) {
         console.error(`Failed to process insights for user ${userId}:`, userError);
@@ -120,7 +128,7 @@ async function handleAutonomousRun(event: WeeklyInsightsEvent, startTime: number
     }
 
     // Complete the autonomous run
-    await completeAutonomousRun('weekly-insights', runTimestamp, {
+    await completeAutonomousRun('daily-insights', runTimestamp, {
       usersProcessed,
       insightsGenerated: totalInsights,
       recommendationsCreated: totalRecommendations,
@@ -136,12 +144,12 @@ async function handleAutonomousRun(event: WeeklyInsightsEvent, startTime: number
       insightsGenerated: totalInsights,
       recommendationsCreated: totalRecommendations,
       duration: Date.now() - startTime,
-      message: `Autonomous weekly insights generation completed for ${usersProcessed} users`
+      message: `Autonomous daily insights generation completed for ${usersProcessed} users`
     };
 
   } catch (error) {
     await failAutonomousRun(
-      'weekly-insights',
+      'daily-insights',
       runTimestamp,
       error instanceof Error ? error.message : 'Unknown error',
       Date.now() - startTime
@@ -155,18 +163,36 @@ async function handleAutonomousRun(event: WeeklyInsightsEvent, startTime: number
  */
 async function processUserInsights(
   userId: string,
-  weekOf?: string,
+  dateRange?: { start: string; end: string },
   forceRegenerate: boolean = false
 ): Promise<any> {
-  // Determine the week to analyze
-  const weekDate = weekOf ? new Date(weekOf) : new Date();
-  const weekKey = getISOWeekKey(weekDate);
+  // Get the most recent transactions for the user (up to 100 transactions)
+  const transactions = await getAllTransactionsForUser(userId, 100);
+  
+  if (transactions.length === 0) {
+    console.log('No transactions found for user:', userId);
+    return {
+      success: false,
+      message: 'No transactions found for user',
+      userId
+    };
+  }
 
-  // Check if insights already exist for this week
+  console.log(`Analyzing ${transactions.length} most recent transactions for user ${userId}`);
+
+  // Use current date as analysis date
+  const analysisDate = new Date();
+  
+  // Determine the date range of the transactions we're analyzing
+  const transactionDates = transactions.map(t => t.date).sort((a, b) => a.getTime() - b.getTime());
+  const analysisStart = transactionDates[0];
+  const analysisEnd = transactionDates[transactionDates.length - 1];
+
+  // Check if insights already exist for today (unless force regenerate)
   if (!forceRegenerate) {
-    const existingInsights = await getWeeklyInsight(userId, weekDate);
+    const existingInsights = await getDailyInsight(userId, analysisDate);
     if (existingInsights) {
-      console.log('Returning existing insights for week:', weekKey);
+      console.log('Returning existing insights for today for user:', userId);
       return {
         success: true,
         insights: existingInsights,
@@ -175,20 +201,6 @@ async function processUserInsights(
       };
     }
   }
-
-  // Get transactions for the week
-  const transactions = await getTransactionsByWeek(userId, weekDate);
-  
-  if (transactions.length === 0) {
-    console.log('No transactions found for week:', weekKey);
-    return {
-      success: false,
-      message: 'No transactions found for the specified week',
-      weekKey
-    };
-  }
-
-  console.log(`Analyzing ${transactions.length} transactions for week ${weekKey}`);
 
   // Analyze spending patterns
   const spendingPatterns = await analyzeSpendingPatterns(transactions, userId);
@@ -210,29 +222,31 @@ async function processUserInsights(
     .filter(t => t.transactionType === 'debit')
     .reduce((sum, t) => sum + t.amount, 0);
 
-  // Create weekly insight
-  const weeklyInsight: WeeklyInsight = {
+  // Create daily insight
+  const dailyInsight: DailyInsight = {
     id: randomUUID(),
     userId,
-    weekOf: weekDate,
+    analysisDate: analysisDate,
+    analysisStartDate: analysisStart,
+    analysisEndDate: analysisEnd,
     totalSpent,
     topCategories: categorySpending.slice(0, 5), // Top 5 categories
     recommendations,
     potentialSavings,
     implementedActions: [], // Will be updated when user implements recommendations
     generatedAt: new Date(),
-    weekNumber: getISOWeekNumber(weekDate),
-    year: weekDate.getFullYear()
+    transactionCount: transactions.length
   };
 
   // Store insights in database
-  await createWeeklyInsight(weeklyInsight);
+  await createDailyInsight(dailyInsight);
 
-  console.log(`Generated insights for week ${weekKey}: ${recommendations.length} recommendations, ${potentialSavings.toFixed(2)} potential savings`);
+  const transactionDateRange = `${analysisStart.toISOString().split('T')[0]} to ${analysisEnd.toISOString().split('T')[0]}`;
+  console.log(`Generated insights for user ${userId} based on ${transactions.length} transactions from ${transactionDateRange}: ${recommendations.length} recommendations, ${potentialSavings.toFixed(2)} potential savings`);
 
   return {
     success: true,
-    insights: weeklyInsight,
+    insights: dailyInsight,
     generated: true,
     message: `Generated ${recommendations.length} recommendations with ${potentialSavings.toFixed(2)} potential savings`
   };
@@ -580,16 +594,7 @@ function findDuplicateTransactions(transactions: Transaction[]): Transaction[] {
   return duplicates;
 }
 
-function getISOWeekNumber(date: Date): number {
-  const d = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
-  const dayNum = d.getUTCDay() || 7;
-  d.setUTCDate(d.getUTCDate() + 4 - dayNum);
-  const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
-  return Math.ceil((((d.getTime() - yearStart.getTime()) / 86400000) + 1) / 7);
-}
-
-function getISOWeekKey(date: Date): string {
-  const year = date.getFullYear();
-  const week = getISOWeekNumber(date);
-  return `${year}-W${week.toString().padStart(2, '0')}`;
+// Helper function to format date range for logging
+function getDateRangeKey(startDate: Date, endDate: Date): string {
+  return `${startDate.toISOString().split('T')[0]}_to_${endDate.toISOString().split('T')[0]}`;
 }

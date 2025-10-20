@@ -54,6 +54,10 @@ export const handler = async (
       case httpMethod === 'POST' && path.startsWith('/users/') && path.includes('/insights/generate'):
         return await handleGenerateInsights(pathParameters?.userId, event);
 
+      // Invoke Bedrock Agent for analysis
+      case httpMethod === 'POST' && path.startsWith('/agent/invoke'):
+        return await handleAgentInvoke(event);
+
       // Get transactions for a user
       case httpMethod === 'GET' && path.startsWith('/users/') && path.includes('/transactions'):
         return await handleGetTransactions(pathParameters?.userId, queryStringParameters as Record<string, string> | null);
@@ -316,6 +320,66 @@ async function handleGetLatestAutonomousRun(
   const latestRun = await getLatestAutonomousRun(runType);
 
   return createResponse(200, latestRun);
+}
+
+/**
+ * Handle Bedrock Agent invocation
+ */
+async function handleAgentInvoke(event: APIGatewayProxyEvent): Promise<APIGatewayProxyResult> {
+  const body = JSON.parse(event.body || '{}');
+  const { userId, message, sessionId } = body;
+
+  if (!userId || !message) {
+    return createResponse(400, { 
+      error: 'Missing required fields',
+      required: ['userId', 'message']
+    });
+  }
+
+  try {
+    // Import Bedrock Agent Runtime client
+    const { BedrockAgentRuntimeClient, InvokeAgentCommand } = require('@aws-sdk/client-bedrock-agent-runtime');
+    
+    const client = new BedrockAgentRuntimeClient({ region: process.env.AWS_REGION || 'us-east-1' });
+    
+    // Use the agent ID from your infrastructure
+    const agentId = 'ILBRXMGEWH'; // Your existing agent ID
+    const agentAliasId = 'TSTALIASID'; // Default test alias
+    
+    const command = new InvokeAgentCommand({
+      agentId,
+      agentAliasId,
+      sessionId: sessionId || `session-${userId}-${Date.now()}`,
+      inputText: message
+    });
+
+    const response = await client.send(command);
+    
+    // Process the streaming response
+    let fullResponse = '';
+    if (response.completion) {
+      for await (const chunk of response.completion) {
+        if (chunk.chunk?.bytes) {
+          const text = new TextDecoder().decode(chunk.chunk.bytes);
+          fullResponse += text;
+        }
+      }
+    }
+
+    return createResponse(200, {
+      response: fullResponse,
+      sessionId: command.input.sessionId,
+      agentId,
+      timestamp: new Date().toISOString()
+    });
+
+  } catch (error) {
+    console.error('Agent invocation error:', error);
+    return createResponse(500, {
+      error: 'Failed to invoke agent',
+      message: error instanceof Error ? error.message : 'Unknown error'
+    });
+  }
 }
 
 /**

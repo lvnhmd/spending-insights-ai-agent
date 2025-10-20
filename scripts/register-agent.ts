@@ -91,7 +91,7 @@ async function registerAgent() {
         foundationModel: agentConfig.foundationModel,
         instruction: agentConfig.instruction,
         agentResourceRoleArn: roleArn,
-        idleSessionTtlInSeconds: 1800, // 30 minutes
+        idleSessionTTLInSeconds: 1800, // 30 minutes
         // Memory configuration
         memoryConfiguration: {
           enabledMemoryTypes: ['SESSION_SUMMARY'],

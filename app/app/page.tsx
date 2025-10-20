@@ -214,29 +214,35 @@ export default function HomePage() {
 
   const generateInsightsForUser = async (userId: string) => {
     try {
-      const response = await fetch(`https://fwp452jpah.execute-api.us-east-1.amazonaws.com/prod/users/${userId}/insights/generate`, {
+      setUploadStatus('🤖 Invoking AI Agent to analyze your spending...')
+      
+      // Use Bedrock Agent instead of direct Lambda calls
+      const response = await fetch(`https://fwp452jpah.execute-api.us-east-1.amazonaws.com/prod/agent/invoke`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          forceRegenerate: true
+          userId: userId,
+          message: `Please analyze my recent transactions and generate personalized spending insights and recommendations. Focus on identifying spending patterns, detecting fees and subscriptions, and providing actionable money-saving recommendations.`,
+          sessionId: `session-${userId}-${Date.now()}`
         })
       })
 
       if (response.ok) {
-        setUploadStatus('✅ Insights generated! Refreshing your recommendations...')
+        const agentResponse = await response.json()
+        setUploadStatus('✅ AI Agent analysis complete! Refreshing your recommendations...')
         
         // Wait a moment for insights to be processed, then refresh the component
         setTimeout(() => {
           setInsightsRefreshKey(prev => prev + 1)
           setUserHasInsights(true)
-          setUploadStatus('✅ New insights generated! Check your personalized recommendations below.')
-        }, 5000) // Wait 5 seconds for processing
+          setUploadStatus('✅ AI Agent generated personalized insights! Check your recommendations below.')
+        }, 3000) // Wait 3 seconds for processing
       }
     } catch (error) {
-      console.error('Failed to generate insights:', error)
-      // Don't show error to user as upload was successful
+      console.error('Failed to invoke AI agent:', error)
+      setUploadStatus('❌ AI Agent analysis failed. Please try again.')
     }
   }
 
